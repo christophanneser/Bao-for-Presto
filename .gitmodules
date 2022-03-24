@@ -1,0 +1,3 @@
+[submodule "Bao-Presto-Integration"]
+	path = Bao-Presto-Integration
+	url = git@github.com:christophanneser/Bao-Presto-Integration.git

@@ -1,0 +1,11 @@
+"""Session properties built into presto server (taken from <presto/SystemSessionProperties.java>)"""
+
+BAO_ENABLE = "bao"
+BAO_EXPORT_GRAPHVIZ = "graphviz"
+BAO_EXPORT_JSON = "json"
+BAO_EXPORT_TIMES = "report_time"
+BAO_GET_QUERY_SPAN = "get_query_span"
+BAO_EXECUTE_QUERY = "execute_query"
+BAO_SOCKET = "bao_socket"
+BAO_DISABLED_OPTIMIZERS = "bao_disabled_optimizers"
+BAO_DISABLED_RULES = "bao_disabled_rules"
