@@ -1,11 +1,11 @@
 """Preprocess Presto json query plans before passing them to Bao"""
 import numpy as np
 from custom_logging import logging
-from query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, UNARY_OPERATORS, \
+from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, UNARY_OPERATORS, \
     LEAF_TYPES
-from query_plan.malformed_plan import MalformedQueryPlanException
-from query_plan.plan_fields import CHILDREN, ESTIMATES, NODE_TYPE, PREPROCESSED, TABLE_NAME
-from query_plan.stats import CPU_COST, ROWS
+from presto_query_plan.malformed_plan import MalformedQueryPlanException
+from presto_query_plan.plan_fields import CHILDREN, ESTIMATES, NODE_TYPE, PREPROCESSED, TABLE_NAME
+from presto_query_plan.stats import CPU_COST, ROWS
 
 
 class TreeBuilderError(Exception):
@@ -48,7 +48,7 @@ class TreeBuilder:
     def __featurize_null_operator(self):
         arr = np.zeros(len(ENCODED_TYPES) + 1)
         arr[-1] = 1  # declare as null vector
-        return np.concatenate((arr, self.__stats._get_null_stats()))
+        return np.concatenate((arr, self.__stats.get_null_stats()))
 
     def plan_to_feature_tree(self, node):
         """This method recursively traverses the query plan and returns a feature tree"""
@@ -114,7 +114,7 @@ class StatExtractor:
                 res += [1, _normalize(np.log(estimates[f] + 1), lo, hi)]
         return res
 
-    def _get_null_stats(self):
+    def get_null_stats(self):
         # create null value
         return [0.0] * (2 * len(self.__fields))
 

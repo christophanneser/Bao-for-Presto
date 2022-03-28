@@ -1,9 +1,9 @@
 """This module trains and evaluates BAO"""
+import os
 import storage
 import model
 import numpy as np
 import pickle
-from plot_optimizer_configs import plot_learned_performance
 from custom_logging import logging
 
 
@@ -23,6 +23,8 @@ def load_data(benchmark=None, training_ratio=0.8):
 
 
 def serialize_data(directory, x_train, y_train, x_test, y_test, training_configs, test_configs):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
     with open('{0}/x_train'.format(directory), 'wb') as f:
         pickle.dump(x_train, f, pickle.HIGHEST_PROTOCOL)
     with open('{0}/y_train'.format(directory), 'wb') as f:
@@ -123,7 +125,7 @@ def choose_best_plans(filename, test_configs):
 
 
 def train():
-    benchmark = 'job'
+    benchmark = 'tpch'
     retrain = True
 
     if retrain:
@@ -155,8 +157,8 @@ def train():
     print('training improvement rel: {:.4f}'.format(abs_improv_test /
                                                     abs_test))
 
-    plot_learned_performance('JOB', performance_test, performance_training)
-    plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
+    # plot_learned_performance('JOB', performance_test, performance_training)
+    # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
 
 
 if __name__ == '__main__':
