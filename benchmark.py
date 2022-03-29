@@ -1,7 +1,6 @@
 """This module coordinates the query span approximation and the generation of new optimizer configurations for a query"""
 import asyncio
 import operator
-import cluster_controller
 import prestodb
 import storage
 import settings
@@ -208,9 +207,6 @@ def run_query_with_optimizer_configs(connection, query_path):
 
         # check first if this config generates a new query plan (prevent actual execution of plan)
         set_presto_config(connection, 'execute_query', False)
-        if cluster_controller.restart_if_required():
-            for setting in optimizer_configs:
-                set_optimizer_config(connection, setting)
         run(connection, query_path)
         set_presto_config(connection, 'execute_query', True)
 
@@ -218,7 +214,7 @@ def run_query_with_optimizer_configs(connection, query_path):
             num_duplicates += 1
             continue
 
-        run_config(config, connection, query_path, optimizer_configs)
+        run_config(config, connection, query_path)
 
     enable_all_optimizers_and_rules(connection)
     run_config(config, connection, query_path)  # re-run default config with all optimizers being enabled again
@@ -226,19 +222,13 @@ def run_query_with_optimizer_configs(connection, query_path):
     bao_logging.info('Found %s duplicated query plans!', num_duplicates)
 
 
-def run_config(config, conn, query_path, optimizer_configs=frozenset()):
+def run_config(config, conn, query_path):
     for repeat in range(settings.REPEATS):
-        # restart server if required
-        if cluster_controller.restart_if_required():
-            for setting in optimizer_configs:
-                set_optimizer_config(conn, setting)
-
         result = run(conn, query_path)
         if isinstance(result, prestodb.exceptions.PrestoQueryError):
             # configuration does not work -> disabled optimizers/rules are required
             if result.error_name == 'NO_NODES_AVAILABLE':
-                # server is not in good shape right now -> re-run experiment please
-                cluster_controller.NO_NODES_AVAILABLE_ERROR = True
+                bao_logging.fatal('presto error: NO_NODES_AVAILABLE')
                 repeat -= 1
                 continue
             else:
@@ -265,7 +255,6 @@ def run_query_get_span(connection, query_path):
     def _get_span_async():
         return asyncio.gather(_run_query_async(connection, query_string), _receive_span_async())
 
-    cluster_controller.restart_if_required()
     bao_logging.info('Approximate query span for query: %s', query_path)
     storage.register_query(query_path)
     query_string = load_query(query_path)

@@ -6,7 +6,6 @@ import sys
 
 from parser import get_parser
 import benchmark
-import cluster_controller
 from presto_connector import get_session
 from benchmark import TPCH_QUERIES_PATH, JOB_QUERIES_PATH, \
     STACK_QUERIES_PATH, set_presto_config, reset_presto_config, run_query_get_span, run_query_with_optimizer_configs
@@ -34,11 +33,6 @@ if __name__ == '__main__':
     settings.REPEATS = args.repeats
     settings.EXPORT_GRAPHVIZ = args.dot
     settings.EXPORT_JSON = args.json
-    POD_ID = os.getenv(
-        'POD_ID')  # executed on kubernetes? run specific query only
-
-    cluster_controller.start_coordinator()
-    assert cluster_controller.is_ready()
 
     reset_presto_config(presto_session.get_connection())
     set_presto_config(presto_session.get_connection(), BAO_EXPORT_GRAPHVIZ, args.dot)
@@ -77,7 +71,6 @@ if __name__ == '__main__':
                 continue
             print(query)
             RUN_QUERY(presto_session.get_connection(), query)
-            cluster_controller.restart_if_required()
     elif args.benchmark == 'tpch':
         for query in range(1, 23):
             if query in [2]:
