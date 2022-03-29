@@ -7,8 +7,9 @@
 - Build from source: initialize the git submodules (presto)
 - Get release
   from: [Bao-Presto-Integration-Releases](https://github.com/christophanneser/Bao-Presto-Integration/releases)
-  
+
 ### Python3 requirements
+
 - Install python requirements using the file `requirements.txt`
 - The benchmark driver will persist all data in a postgres database.
 - Make the following environment variables available when running `driver.py`:
@@ -37,7 +38,10 @@ The benchmark execution consists of two steps:
 
 ### Docker
 
-For convenience, we added a Dockerfile that sets up all components properly. TODO
+For convenience, we added a Dockerfile that sets up all components properly. However, it is necessary to start a
+postgres instance (e.g. on host system) that can be accessed from the dockerized driver.
+
+![Overview](./architecture.png)
 
 ## Code Formatting
 
