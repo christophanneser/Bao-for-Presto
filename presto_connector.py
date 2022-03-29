@@ -102,13 +102,13 @@ class PrestoSession:
 
         def __init__(self):
             self.query_span = QuerySpan()
-            self.execution_stats = dict()
+            self.execution_stats = {}
             self.logical_dot = None
             self.fragmented_dot = None
             self.logical_json = None
             self.fragmented_json = None
             self.allow_reuse_address = True
-            self.recorded_stats = dict()
+            self.recorded_stats = {}
 
     def __init__(self, catalog=None, schema=None, request_timeout=prestodb.constants.DEFAULT_REQUEST_TIMEOUT, execution_timeout='4m'):
         self.connection = prestodb.dbapi.connect(
@@ -134,14 +134,13 @@ class PrestoSession:
         self.connection.schema = schema
 
     def restart_callback_server(self):
-        # close previous callback server, pending requests will be discarded
+        # close previous callback server, old messages/requests will be discarded
         if self.callback_server is not None:
             bao_logging.info('shutdown callback server to discard previous messages')
             self.callback_server.server_close()
 
         bao_logging.info('start callback server')
-        self.callback_server = socketserver.TCPServer(('localhost', 9999),
-                                                      PrestoCallbackHandler)
+        self.callback_server = socketserver.TCPServer(('localhost', 9999), PrestoCallbackHandler)
         self.callback_server.session = self
         self.status = PrestoSession.Status()
 

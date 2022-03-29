@@ -41,7 +41,7 @@ async def _receive_query_plans_async():
 
 
 def load_query(filepath):
-    with open(filepath, 'r') as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         lines = filter(lambda s: not s.startswith('--') and not s == '', lines)
         return ''.join(lines).replace('\\s', ' ').replace(';', '')
@@ -96,7 +96,7 @@ def reset_presto_config(conn):
 def set_presto_config(conn, setting, enable=True):
     try:
         settings.PRESTO_SETTINGS[setting] = enable
-        exec_query(conn, 'SET session {0} = {1}'.format(setting, 'true' if enable else 'false'), set_config_variable=True)
+        exec_query(conn, f'SET session {setting} = {"true" if enable else "false"}', set_config_variable=True)
     except prestodb.exceptions.PrestoUserError:
         pass
 
@@ -228,11 +228,11 @@ def run_config(config, conn, query_path):
         if isinstance(result, prestodb.exceptions.PrestoQueryError):
             # configuration does not work -> disabled optimizers/rules are required
             if result.error_name == 'NO_NODES_AVAILABLE':
-                bao_logging.fatal('presto error: NO_NODES_AVAILABLE')
+                bao_logging.fatal('Presto returned an error while running query %s: NO_NODES_AVAILABLE', query_path)
                 repeat -= 1
                 continue
             else:
-                bao_logging.fatal('optimizer %s cannot be disabled for %s - SKIP this config', config.get_disabled_opts_rules(), query_path)
+                bao_logging.fatal('Optimizer %s cannot be disabled for %s - skip this config', config.get_disabled_opts_rules(), query_path)
                 break
 
         if register_query_config_and_measurement(query_path, config.get_disabled_opts_rules(), result=result[0], cursor=result[1]):
@@ -240,7 +240,7 @@ def run_config(config, conn, query_path):
             break
 
 
-def run_query_get_span(connection, query_path):
+def run_get_query_span(connection, query_path):
     """Given the presto connection and the path to a sql file, get the query span and store it in the database"""
 
     set_presto_config(connection, BAO_GET_QUERY_SPAN, True)
