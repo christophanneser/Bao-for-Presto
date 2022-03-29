@@ -2,7 +2,13 @@
 
 ## Requirements
 
-- Initialize the git submodules (presto)
+### Modified Presto Server
+
+- Build from source: initialize the git submodules (presto)
+- Get release
+  from: [Bao-Presto-Integration-Releases](https://github.com/christophanneser/Bao-Presto-Integration/releases)
+  
+### Python3 requirements
 - Install python requirements using the file `requirements.txt`
 - The benchmark driver will persist all data in a postgres database.
 - Make the following environment variables available when running `driver.py`:
