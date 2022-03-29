@@ -135,14 +135,12 @@ def train():
     else:
         x_train, y_train, x_test, y_test, training_data, test_data = deserialize_data('data')
 
-    performance_test = choose_best_plans('model', test_data)
-    performance_test = list(performance_test)
+    performance_test = list(choose_best_plans('model', test_data))
     # actual_test = list(map(lambda e: float(e[0]), performance_test))
     # learned_test = list(map(lambda e: float(e[1]), performance_test))
     # query_infos_test = list(map(lambda e: e[2], performance_test))
 
-    performance_training = choose_best_plans('model', training_data)
-    performance_training = list(performance_training)
+    performance_training = list(choose_best_plans('model', training_data))
     # actual_test = list(map(lambda e: float(e[0]), performance_training))
     # learned_test = list(map(lambda e: float(e[1]), performance_training))
     # query_infos_test = list(map(lambda e: e[2], performance_training))
@@ -154,11 +152,7 @@ def train():
 
     abs_improv_test = sum([x[3] for x in performance_training])
     abs_test = sum([x[4] for x in performance_training])
-    print('training improvement rel: {:.4f}'.format(abs_improv_test /
-                                                    abs_test))
-
-    # plot_learned_performance('JOB', performance_test, performance_training)
-    # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
+    print('training improvement rel: {:.4f}'.format(abs_improv_test / abs_test))
 
 
 if __name__ == '__main__':

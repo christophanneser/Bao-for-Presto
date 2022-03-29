@@ -1,4 +1,4 @@
-"""This module provides several helper functions to connect to presto server"""
+"""This module provides several helper functions to connect to presto server and to receive messages from Presto via the predefined bao-socket"""
 import prestodb
 from optimizer_config import QuerySpan
 import json
@@ -7,7 +7,7 @@ import socketserver
 from enum import Enum
 from custom_logging import logging
 
-# presto message prefixes
+# expected presto message prefixes
 OPTIMIZERS = 'optimizers:'
 RULES = 'rules:'
 EFFECTIVE = 'effective:'
@@ -15,42 +15,14 @@ REQUIRED = 'required:'
 LOGICAL = 'logical:'
 FRAGMENTED = 'fragmented:'
 
-# encodings
+# message encodings
 JSON = 'json:'
 DOT = 'dot:'
-
-
-# callback_server = None
-# session = None
 
 
 class PrestoOptimizerType(Enum):
     OPTIMIZER = 1
     RULE = 2
-
-
-"""
-def get_connection(catalog=None,
-                   schema=None,
-                   request_timeout=prestodb.constants.DEFAULT_REQUEST_TIMEOUT,
-                   execution_timeout='4m'):
-    global session
-    if session is None:
-        session = prestodb.dbapi.connect(
-            host='localhost',
-            port=8080,
-            user='admin',
-            catalog=catalog,
-            schema=schema,
-            request_timeout=request_timeout,
-            session_properties={'query_max_execution_time': execution_timeout},
-        )
-    if catalog is not None:
-        session.catalog = catalog
-    if session is not None:
-        session.schema = schema
-    return session
-"""
 
 
 def recvall(sock, size, buffer=bytes()):
@@ -122,42 +94,8 @@ class PrestoCallbackHandler(socketserver.BaseRequestHandler):
         self.request.close()
 
 
-"""
-def restart_callback_server():
-    global callback_server
-
-    # close previous callback server, pending requests will be discarded
-    if callback_server is not None:
-        logging.info('shutdown callback server to discard previous messages')
-        callback_server.server_close()
-
-    logging.info('start callback server')
-    callback_server = socketserver.TCPServer(('localhost', 9999),
-                                             PrestoCallbackHandler)
-
-    callback_server.effective_rules = None
-    callback_server.effective_optimizers = None
-    callback_server.required_rules = None
-    callback_server.required_optimizers = None
-
-    callback_server.execution_stats = None
-    callback_server.logical_dot = None
-    callback_server.fragmented_dot = None
-    callback_server.logical_json = None
-    callback_server.fragmented_json = None
-    callback_server.allow_reuse_address = True
-
-    callback_server.recorded_stats = dict()
-
-
-def get_callback():
-    return callback_server
-
-"""
-
-
 class PrestoSession:
-    """todo"""
+    """This class wraps a session to presto as well as a callback server communicating with presto"""
 
     class Status:
         """Store the information received from presto"""
