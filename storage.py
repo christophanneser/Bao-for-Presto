@@ -1,6 +1,6 @@
 """This module implements the connection to the database."""
 import json
-from custom_logging import logging
+from custom_logging import bao_logging
 import os
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ def _db():
 
         url = 'postgresql://{0}:{1}@{2}:5432/{3}'.format(
             user, password, host, database)
-        logging.info('Connect to database: %s', url)
+        bao_logging.info('Connect to database: %s', url)
         ENGINE = create_engine(url)
 
     schema = os.getenv('DB_SCHEMA')
@@ -310,7 +310,7 @@ def check_for_existing_measurements(query_path, disabled_rules):
 
 
 def register_measurement(query_path, disabled_rules, elapsed, planning, scheduling, running, finishing, cpu, input_data_size, nodes):
-    logging.info('register a new measurement for query %s and the disabled rules/optimizers [%s]', query_path, disabled_rules)
+    bao_logging.info('register a new measurement for query %s and the disabled rules/optimizers [%s]', query_path, disabled_rules)
     with _db() as conn:
         now = datetime.now()
         query = f"""INSERT INTO measurements (query_optimizer_config_id, elapsed, planning, scheduling, running,

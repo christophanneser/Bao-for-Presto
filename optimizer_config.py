@@ -3,7 +3,7 @@ import storage
 import pandasql as pdsql
 import statistics
 import progressbar
-from custom_logging import logging
+from custom_logging import bao_logging
 from presto_query_optimizer import always_required_optimizers, always_required_rules
 from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES
 
@@ -160,7 +160,7 @@ class OptimizerConfig:
                 # use configs from n-1 and combine with n=1
                 configs = self.dp_combine(single_optimizers, combinations_previous_run)
             except ArithmeticError as err:
-                logging.info('DP: get_next_configs() results in an ArithmeticError %s', err)
+                bao_logging.info('DP: get_next_configs() results in an ArithmeticError %s', err)
                 configs = None
         self.n += 1
         return configs
@@ -179,7 +179,7 @@ class OptimizerConfig:
         self.configs = self.get_next_configs()
         if self.configs is None:
             return False
-        logging.info('Enter next DP stage, run %s configurations', len(self.configs))
+        bao_logging.info('Enter next DP stage, run %s configurations', len(self.configs))
         self.restart_progress_bar()
         self.iterator = -1
         return self.iterator < self.get_num_configs() - 1

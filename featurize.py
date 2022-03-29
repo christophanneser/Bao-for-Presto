@@ -1,6 +1,6 @@
 """Preprocess Presto json query plans before passing them to Bao"""
 import numpy as np
-from custom_logging import logging
+from custom_logging import bao_logging
 from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, UNARY_OPERATORS, \
     LEAF_TYPES
 from presto_query_plan.malformed_plan import MalformedQueryPlanException
@@ -79,7 +79,7 @@ class TreeBuilder:
 
 def _normalize(x, lo, hi):
     if hi == lo:
-        logging.warning('[WARNING] normalization divide by zero')
+        bao_logging.warning('[WARNING] normalization divide by zero')
         return np.infty if (np.log(x + 1) - lo) > 0 else -np.infty
     return (np.log(x + 1) - lo) / (hi - lo)
 

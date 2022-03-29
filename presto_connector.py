@@ -5,7 +5,7 @@ import json
 import struct
 import socketserver
 from enum import Enum
-from custom_logging import logging
+from custom_logging import bao_logging
 
 # expected presto message prefixes
 OPTIMIZERS = 'optimizers:'
@@ -136,10 +136,10 @@ class PrestoSession:
     def restart_callback_server(self):
         # close previous callback server, pending requests will be discarded
         if self.callback_server is not None:
-            logging.info('shutdown callback server to discard previous messages')
+            bao_logging.info('shutdown callback server to discard previous messages')
             self.callback_server.server_close()
 
-        logging.info('start callback server')
+        bao_logging.info('start callback server')
         self.callback_server = socketserver.TCPServer(('localhost', 9999),
                                                       PrestoCallbackHandler)
         self.callback_server.session = self

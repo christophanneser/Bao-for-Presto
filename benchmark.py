@@ -9,7 +9,7 @@ import hashlib
 from optimizer_config import OptimizerConfig
 from functools import reduce
 from presto_connector import get_session
-from custom_logging import logging
+from custom_logging import bao_logging
 from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES, BAO_ENABLE, BAO_EXECUTE_QUERY, BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON, \
     BAO_EXPORT_TIMES, BAO_GET_QUERY_SPAN
 
@@ -24,15 +24,15 @@ STACK_QUERIES_PATH = 'queries/stackoverflow/'
 async def _receive_query_plans_async():
     callback_server = get_session().callback_server
     if settings.EXPORT_GRAPHVIZ:
-        logging.info('receive dot plans')
+        bao_logging.info('receive dot plans')
         callback_server.handle_request()
         callback_server.handle_request()
-        logging.info('received both dot plans')
+        bao_logging.info('received both dot plans')
     if settings.EXPORT_JSON:
-        logging.info('receive json plans')
+        bao_logging.info('receive json plans')
         callback_server.handle_request()
         callback_server.handle_request()
-        logging.info('received both json plans')
+        bao_logging.info('received both json plans')
 
     status = get_session().status
     settings.LOGICAL_DOT = status.logical_dot
@@ -55,7 +55,7 @@ async def execute(cur, query_string):
         result = cur.fetchall()
         return result, cur
     except prestodb.exceptions.PrestoQueryError as e:
-        logging.error('Received an error during query execution: %s', str(e))
+        bao_logging.error('Received an error during query execution: %s', str(e))
         return e
 
 
@@ -119,10 +119,10 @@ def run(conn, query_path):
     try:
         return exec_query(conn, query_string)
     except prestodb.exceptions.PrestoUserError as e:
-        logging.error('Error with query: %s: %s', query_path, str(e))
+        bao_logging.error('Error with query: %s: %s', query_path, str(e))
         return e
     except prestodb.exceptions.PrestoQueryError as e:
-        logging.error('Error with query: %s: %s', query_path, str(e))
+        bao_logging.error('Error with query: %s: %s', query_path, str(e))
         return e
 
 
@@ -136,7 +136,7 @@ def register_query_config_and_measurement(query_path, disabled_rules, cursor=Non
     is_duplicate = storage.register_query_config(query_path, disabled_rules, logical_dot, fragmented_dot, logical_json, fragmented_json, plan_hash)
     is_duplicate = False  # fixme
     if is_duplicate:
-        logging.info('Plan hash already known')
+        bao_logging.info('Plan hash already known')
     if not (is_duplicate or initial_call):
         register_time_measurement(query_path, disabled_rules, cursor, result)
 
@@ -162,11 +162,11 @@ def register_time_measurement(query_path, disabled_rules, cursor, result):
     # check if results match
     result_fingerprint = hash_sql_result()
     if not storage.register_query_fingerprint(query_path, result_fingerprint):
-        logging.warning('Result fingerprint=%s does not match existing fingerprints!', result_fingerprint)
+        bao_logging.warning('Result fingerprint=%s does not match existing fingerprints!', result_fingerprint)
 
     status = get_session().status
     if not status.execution_stats['query_id'] == cursor.stats['queryId']:
-        logging.fatal('WRONG EXECUTION STATS RECEIVED: %s vs %s', status.execution_stats['query_id'], cursor.stats['queryId'])
+        bao_logging.fatal('WRONG EXECUTION STATS RECEIVED: %s vs %s', status.execution_stats['query_id'], cursor.stats['queryId'])
         status.execution_stats = None
         return
     # wait for presto server to call back
@@ -188,7 +188,7 @@ def register_time_measurement(query_path, disabled_rules, cursor, result):
 
 def run_query_with_optimizer_configs(connection, query_path):
     """Use dynamic programming to find good optimizer configs"""
-    logging.info('Start DP for query %s', query_path)
+    bao_logging.info('Start DP for query %s', query_path)
 
     set_presto_config(connection, BAO_EXPORT_TIMES, True)
 
@@ -223,7 +223,7 @@ def run_query_with_optimizer_configs(connection, query_path):
     enable_all_optimizers_and_rules(connection)
     run_config(config, connection, query_path)  # re-run default config with all optimizers being enabled again
 
-    logging.info('Found %s duplicated query plans!', num_duplicates)
+    bao_logging.info('Found %s duplicated query plans!', num_duplicates)
 
 
 def run_config(config, conn, query_path, optimizer_configs=frozenset()):
@@ -242,7 +242,7 @@ def run_config(config, conn, query_path, optimizer_configs=frozenset()):
                 repeat -= 1
                 continue
             else:
-                logging.fatal('optimizer %s cannot be disabled for %s - SKIP this config', config.get_disabled_opts_rules(), query_path)
+                bao_logging.fatal('optimizer %s cannot be disabled for %s - SKIP this config', config.get_disabled_opts_rules(), query_path)
                 break
 
         if register_query_config_and_measurement(query_path, config.get_disabled_opts_rules(), result=result[0], cursor=result[1]):
@@ -258,15 +258,15 @@ def run_query_get_span(connection, query_path):
     async def _receive_span_async():
         # query span comprises 4 components (required/effective rules/optimizers);
         for _ in range(4):
-            logging.debug('wait for query span callback ...')
+            bao_logging.debug('wait for query span callback ...')
             get_session().callback_server.handle_request()
-            logging.debug('callback received!')
+            bao_logging.debug('callback received!')
 
     def _get_span_async():
         return asyncio.gather(_run_query_async(connection, query_string), _receive_span_async())
 
     cluster_controller.restart_if_required()
-    logging.info('Approximate query span for query: %s', query_path)
+    bao_logging.info('Approximate query span for query: %s', query_path)
     storage.register_query(query_path)
     query_string = load_query(query_path)
 

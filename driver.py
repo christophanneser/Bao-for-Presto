@@ -11,7 +11,7 @@ from presto_connector import get_session
 from benchmark import TPCH_QUERIES_PATH, JOB_QUERIES_PATH, \
     STACK_QUERIES_PATH, set_presto_config, reset_presto_config, run_query_get_span, run_query_with_optimizer_configs
 import settings
-from custom_logging import logging
+from custom_logging import bao_logging
 from session_properties import BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON
 
 
@@ -50,10 +50,10 @@ if __name__ == '__main__':
     RUN_QUERY = None
     if args.query_span:
         RUN_QUERY = run_query_get_span
-        logging.info('approximate query spans')
+        bao_logging.info('approximate query spans')
     elif args.record_time:
         RUN_QUERY = run_query_with_optimizer_configs
-        logging.info('collect measurements')
+        bao_logging.info('collect measurements')
 
     assert RUN_QUERY is not None
     print('connect to catalog:schema={0}:{1}'.format(args.catalog,

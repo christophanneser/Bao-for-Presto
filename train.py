@@ -4,7 +4,7 @@ import storage
 import model
 import numpy as np
 import pickle
-from custom_logging import logging
+from custom_logging import bao_logging
 
 
 class BaoTrainingException(Exception):
@@ -56,13 +56,13 @@ def deserialize_data(directory):
 
 
 def train_and_save_model(filename, x_train, y_train, x_test, y_test, verbose=True):
-    logging.info('training samples: %s, test samples: %s', len(x_train), len(x_test))
+    bao_logging.info('training samples: %s, test samples: %s', len(x_train), len(x_test))
 
     if not x_train:
         raise BaoTrainingException('Cannot train a Bao model with no experience')
 
     if len(x_train) < 20:
-        logging.warning('Warning: trying to train a Bao model with fewer than 20 datapoints.')
+        bao_logging.warning('Warning: trying to train a Bao model with fewer than 20 datapoints.')
 
     regression_model = model.BaoRegression(have_cache_data=True, verbose=verbose)
     losses = regression_model.fit(x_train, y_train, x_test, y_test)
@@ -74,19 +74,19 @@ def train_and_save_model(filename, x_train, y_train, x_test, y_test, verbose=Tru
 def evaluate_prediction(y, prediction, plans):
     default_plan = list(filter(lambda x: x.num_disabled_rules == 0, plans))[0]
 
-    logging.info('y:\t%s', '\t'.join(['{:.2f}'.format(_) for _ in y]))
-    logging.info('ŷ:\t%s', '\t'.join('{:.2f}'.format(_[0]) for _ in prediction))
+    bao_logging.info('y:\t%s', '\t'.join(['{:.2f}'.format(_) for _ in y]))
+    bao_logging.info('ŷ:\t%s', '\t'.join('{:.2f}'.format(_[0]) for _ in prediction))
     min_prediction_index = np.argmin(prediction)
-    logging.info('min pred index: %s', str(min_prediction_index))
+    bao_logging.info('min pred index: %s', str(min_prediction_index))
 
     # evaluate performance gains
     performance_from_model = y[min_prediction_index]
-    logging.info('best choice -> %s', str(y[0] / default_plan.running_time))
+    bao_logging.info('best choice -> %s', str(y[0] / default_plan.running_time))
 
     if performance_from_model < default_plan.running_time:
-        logging.info('good choice -> %s', str(performance_from_model / default_plan.running_time))
+        bao_logging.info('good choice -> %s', str(performance_from_model / default_plan.running_time))
     else:
-        logging.info('bad choice -> %s', str(performance_from_model / default_plan.running_time))
+        bao_logging.info('bad choice -> %s', str(performance_from_model / default_plan.running_time))
 
     return [(default_plan.running_time - y[0]) / default_plan.running_time,
             (default_plan.running_time - y[min_prediction_index]) /
@@ -114,7 +114,7 @@ def choose_best_plans(filename, test_configs):
         plans_and_estimates = all_query_plans[query_id]
         plans_and_estimates = sorted(plans_and_estimates, key=lambda record: record.running_time)
 
-        logging.info('Preprocess data for query %s', plans_and_estimates[0].query_path)
+        bao_logging.info('Preprocess data for query %s', plans_and_estimates[0].query_path)
         x = [x.plan_json for x in plans_and_estimates]
         y = [x.running_time for x in plans_and_estimates]
 

@@ -5,7 +5,7 @@ import torch
 import torch.optim
 import joblib
 import os
-from custom_logging import logging
+from custom_logging import bao_logging
 from sklearn import preprocessing
 from sklearn.pipeline import Pipeline
 from torch.utils.data import DataLoader
@@ -83,7 +83,7 @@ class BaoRegression:
 
     def __log(self, *args):
         if self.__verbose:
-            logging.info(*args)
+            bao_logging.info(*args)
 
     def num_items_trained_on(self):
         return self.__n
