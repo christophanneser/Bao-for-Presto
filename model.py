@@ -1,3 +1,20 @@
+#
+# Copyright (C) 2020  Ryan Marcus
+# Copyright (C) 2022  Christoph Anneser
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 """This module implements the BaoRegression model."""
 import json
 import numpy as np
@@ -59,6 +76,7 @@ def collate(x):
         trees.append(tree)
         targets.append(target)
 
+    # pylint: disable=not-callable
     targets = torch.tensor(targets)
     return trees, targets
 
@@ -66,7 +84,7 @@ def collate(x):
 class BaoRegression:
     """This class represents the Bao regression model used to predict execution times of query plans"""
 
-    def __init__(self, verbose=False, have_cache_data=False):
+    def __init__(self, verbose=False):
         self.__net = None
         self.__verbose = verbose
 
@@ -76,10 +94,8 @@ class BaoRegression:
         self.__pipeline = Pipeline([('log', log_transformer), ('scale', scale_transformer)])
 
         self.__tree_transform = TreeFeaturizer()
-        self.__have_cache_data = have_cache_data
         self.__in_channels = None
         self.__n = 0
-        self.__n_test = 0
 
     def __log(self, *args):
         if self.__verbose:
@@ -129,11 +145,9 @@ class BaoRegression:
         x_test = [json.loads(x) if isinstance(x, str) else x for x in x_test]
 
         self.__n = len(x_train)
-        self.__n_test = len(x_test)
 
         # transform the set of trees into feature vectors using a log
-        # (assuming the tail behavior exists, TODO investigate
-        #  the quantile transformer from scikit)
+        # (assuming the tail behavior exists, TODO investigate the quantile transformer from scikit)
         y_train = self.__pipeline.fit_transform(y_train.reshape(-1, 1)).astype(np.float32)
         y_test = self.__pipeline.fit_transform(y_test.reshape(-1, 1)).astype(np.float32)
 

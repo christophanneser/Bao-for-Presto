@@ -1,7 +1,25 @@
+#
+# Copyright (C) 2020  Ryan Marcus
+# Copyright (C) 2022  Christoph Anneser
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 """Preprocess Presto json query plans before passing them to Bao"""
 import numpy as np
 from custom_logging import bao_logging
-from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, UNARY_OPERATORS, \
+from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, \
+    UNARY_OPERATORS, \
     LEAF_TYPES
 from presto_query_plan.malformed_plan import MalformedQueryPlanException
 from presto_query_plan.plan_fields import CHILDREN, ESTIMATES, NODE_TYPE, PREPROCESSED, TABLE_NAME
@@ -10,8 +28,7 @@ from presto_query_plan.stats import CPU_COST, ROWS
 
 class TreeBuilderError(Exception):
     def __init__(self, msg):
-        Exception.__init__(self)
-        self.__msg = msg
+        Exception.__init__(self, msg)
 
 
 def is_binary_operator(node):
@@ -31,6 +48,7 @@ class TreeBuilder:
 
     def __init__(self, stats_extractor, relations):
         self.__stats = stats_extractor
+        # pylint: disable=unused-private-member
         self.__relations = sorted(relations)
 
     def __featurize_binary_operator(self, node):

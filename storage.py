@@ -1,3 +1,20 @@
+#
+# Copyright (C) 2020  Ryan Marcus
+# Copyright (C) 2022  Christoph Anneser
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 """This module implements the connection to the database."""
 import json
 from custom_logging import bao_logging
@@ -28,17 +45,17 @@ def _db():
             host = os.getenv('POSTGRES_SERVICE_HOST')
         assert host is not None
 
-        url = 'postgresql://{0}:{1}@{2}:5432/{3}'.format(
-            user, password, host, database)
+        url = f'postgresql://{user}:{password}@{host}:5432/{database}'
         bao_logging.info('Connect to database: %s', url)
         ENGINE = create_engine(url)
 
     schema = os.getenv('DB_SCHEMA')
     conn = ENGINE.connect()
-    conn.execute('SET search_path TO {0}'.format(schema))
+    conn.execute(f'SET search_path TO {schema}')
 
-    sql_file = open(SCHEMA_FILE)
-    schema = sql_file.read()
+    with open(SCHEMA_FILE, encoding='utf-8') as f:
+        schema = f.read()
+
     for statement in schema.split(';'):
         if len(statement.strip()) > 0:
             conn.execute(statement)
@@ -69,8 +86,8 @@ def register_query_fingerprint(query_path, fingerprint):
 def register_optimizer(query_path, optimizer, table):
     with _db() as conn:
         try:
-            stmt = text('INSERT INTO {0} (query_id, optimizer_id) '
-                        'SELECT id, :optimizer FROM queries WHERE query_path = :query_path'.format(table))
+            stmt = text(f'INSERT INTO {table} (query_id, optimizer_id) '
+                        'SELECT id, :optimizer FROM queries WHERE query_path = :query_path')
             conn.execute(stmt, optimizer=optimizer, query_path=query_path)
         except IntegrityError:
             pass  # do not store duplicates
@@ -129,7 +146,7 @@ def best_alternative_configuration(benchmark=None):
     _db()
     cursor = ENGINE.raw_connection().cursor()
     schema = os.getenv('DB_SCHEMA')
-    cursor.execute('SET search_path TO {0}'.format(schema))
+    cursor.execute(f'SET search_path TO {schema}')
     cursor.execute(stmt)
     return [OptimizerConfigResult(*row) for row in cursor.fetchall()]
 
@@ -163,12 +180,12 @@ def experience(benchmark=None, training_ratio=0.8):
     _db()
     cursor = ENGINE.raw_connection().cursor()
     schema = os.getenv('DB_SCHEMA')
-    cursor.execute('SET search_path TO {0}'.format(schema))
+    cursor.execute(f'SET search_path TO {schema}')
     cursor.execute(stmt)
     rows = [Measurement(*row) for row in cursor.fetchall()]
 
     # group training and test data by query
-    result = dict()
+    result = {}
     for row in rows:
         if row.query_id in result:
             result[row.query_id].append(row)
@@ -180,6 +197,7 @@ def experience(benchmark=None, training_ratio=0.8):
     split_index = int(len(keys) * training_ratio)
     train_keys = keys[:split_index]
     test_keys = keys[split_index:]
+    train_keys = test_keys = [1]
 
     train_data = np.concatenate([result[key] for key in train_keys])
     test_data = np.concatenate([result[key] for key in test_keys])
@@ -190,7 +208,7 @@ def experience(benchmark=None, training_ratio=0.8):
 def register_rule(query_path, rule, table):
     with _db() as conn:
         try:
-            stmt = text('INSERT INTO {0} (query_id, rule) SELECT id, :rule FROM queries WHERE query_path = :query_path'.format(table))
+            stmt = text(f'INSERT INTO {table} (query_id, rule) SELECT id, :rule FROM queries WHERE query_path = :query_path')
             conn.execute(stmt, rule=rule, query_path=query_path)
         except IntegrityError:
             pass  # do not store duplicates
@@ -242,7 +260,7 @@ def select_query(query):
     cursor = ENGINE.raw_connection().cursor()
 
     schema = os.getenv('DB_SCHEMA')
-    cursor.execute('SET search_path TO {0}'.format(schema))
+    cursor.execute(f'SET search_path TO {schema}')
     cursor.execute(query)
     return [row[0] for row in cursor.fetchall()]
 
@@ -281,14 +299,12 @@ def register_query_config(query_path, disabled_rules, logical_dot, fragmented_do
                 json.dumps(fragmented_json))
 
             num_disabled_rules = 0 if disabled_rules is None else disabled_rules.count(',') + 1
-            stmt = """INSERT INTO query_optimizer_configs
+            stmt = f"""INSERT INTO query_optimizer_configs
                    (query_id, disabled_rules, logical_plan_dot, 
                    fragmented_plan_dot, logical_plan_json, fragmented_plan_json,
                     num_disabled_rules, hash, duplicated_plan) 
-                   SELECT id, '{1}', {2}, {3}, {4}, {5}, {6}, {7}, {8} from queries where query_path = '{0}'
-                   """.format(
-                query_path, disabled_rules, logical_dot_processed, fragmented_dot_processed, logical_json_processed, fragmented_json_processed,
-                num_disabled_rules, plan_hash, is_duplicate)
+                   SELECT id, '{disabled_rules}', {logical_dot_processed}, {fragmented_dot_processed}, {logical_json_processed}, {fragmented_json_processed}, {num_disabled_rules}, {plan_hash}, {is_duplicate} from queries where query_path = '{query_path}'
+                   """
             conn.execute(stmt)
         except IntegrityError:
             pass  # query configuration has already been inserted
@@ -297,13 +313,13 @@ def register_query_config(query_path, disabled_rules, logical_dot, fragmented_do
 
 
 def check_for_existing_measurements(query_path, disabled_rules):
-    query = """select count(*) as num_measurements
+    query = f"""select count(*) as num_measurements
                 from measurements m, query_optimizer_configs qoc, queries q
                 where m.query_optimizer_config_id = qoc.id
                 and qoc.query_id = q.id
-                and q.query_path = '{0}'
-                and qoc.disabled_rules = '{1}'
-             """.format(query_path, disabled_rules)
+                and q.query_path = '{query_path}'
+                and qoc.disabled_rules = '{disabled_rules}'
+             """
     df = get_df(query)
     values = df['num_measurements']
     return values[0] > 0
@@ -315,7 +331,7 @@ def register_measurement(query_path, disabled_rules, elapsed, planning, scheduli
         now = datetime.now()
         query = f"""INSERT INTO measurements (query_optimizer_config_id, elapsed, planning, scheduling, running,
                 finishing, machine, time, cpu_time, input_data_size, nodes) 
-                SELECT id, {elapsed}, {planning}, {scheduling}, {running}, {finishing}, \'{socket.gethostname()}\', \'{now.strftime('%m/%d/%Y, %H:%M:%S')}\', {cpu}, {input_data_size}, {nodes} FROM query_optimizer_configs 
+                SELECT id, {elapsed}, {planning}, {scheduling}, {running}, {finishing}, '{socket.gethostname()}', '{now.strftime('%m/%d/%Y, %H:%M:%S')}', {cpu}, {input_data_size}, {nodes} FROM query_optimizer_configs 
                 WHERE query_id = (SELECT id from queries where query_path = '{query_path}') and disabled_rules = '{disabled_rules}'
                 """
         conn.execute('SET datestyle = mdy;')

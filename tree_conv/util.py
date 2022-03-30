@@ -1,3 +1,4 @@
+"""Provide utility functions to transform query plans to feature vectors"""
 import numpy as np
 import torch
 
@@ -11,9 +12,7 @@ def _is_leaf(x, left_child, right_child):
     has_right = right_child(x) is not None
 
     if has_left != has_right:
-        raise TreeConvolutionError(
-            "All nodes must have both a left and a right child or no children"
-        )
+        raise TreeConvolutionError("All nodes must have both a left and a right child or no children")
 
     return not has_left
 
@@ -47,10 +46,8 @@ def _flatten(root, transformer, left_child, right_child):
 
     try:
         accum = [np.zeros(accum[0].shape)] + accum
-    except:
-        raise TreeConvolutionError(
-            "Output of transformer must have a .shape (e.g., numpy array)"
-        )
+    except Exception as e:
+        raise TreeConvolutionError("Output of transformer must have a .shape (e.g., numpy array)") from e
 
     return np.array(accum)
 
@@ -84,7 +81,7 @@ def _preorder_indexes(root, left_child, right_child, idx=1):
 
 
 def _tree_conv_indexes(root, left_child, right_child):
-    """ 
+    """
     Create indexes that, when used as indexes into the output of `flatten`,
     create an array such that a stride-3 1D convolution is the same as a
     tree convolution.
@@ -119,10 +116,7 @@ def _pad_and_combine(x):
 
     for itm in x:
         if itm.dtype == np.dtype("object"):
-            raise TreeConvolutionError(
-                "Transformer outputs could not be unified into an array. "
-                + "Are they all the same size?"
-            )
+            raise TreeConvolutionError("Transformer outputs could not be unified into an array. Are they all the same size?")
 
     second_dim = x[0].shape[1]
     for itm in x[1:]:
@@ -149,7 +143,6 @@ def prepare_trees(trees, transformer, left_child, right_child, cuda=False):
     if cuda:
         flat_trees = flat_trees.cuda()
 
-    # todo what about these indexes?
     indexes = [_tree_conv_indexes(x, left_child, right_child) for x in trees]
     indexes = _pad_and_combine(indexes)
     indexes = torch.Tensor(indexes).long()
@@ -157,4 +150,4 @@ def prepare_trees(trees, transformer, left_child, right_child, cuda=False):
     if cuda:
         indexes = indexes.cuda()
 
-    return (flat_trees, indexes)
+    return flat_trees, indexes

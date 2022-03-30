@@ -1,3 +1,20 @@
+#
+# Copyright (C) 2020  Ryan Marcus
+# Copyright (C) 2022  Christoph Anneser
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 """This module trains and evaluates BAO"""
 import os
 import storage
@@ -25,32 +42,32 @@ def load_data(benchmark=None, training_ratio=0.8):
 def serialize_data(directory, x_train, y_train, x_test, y_test, training_configs, test_configs):
     if not os.path.exists(directory):
         os.makedirs(directory)
-    with open('{0}/x_train'.format(directory), 'wb') as f:
+    with open(f'{directory}/x_train', 'wb') as f:
         pickle.dump(x_train, f, pickle.HIGHEST_PROTOCOL)
-    with open('{0}/y_train'.format(directory), 'wb') as f:
+    with open(f'{directory}/y_train', 'wb') as f:
         pickle.dump(y_train, f, pickle.HIGHEST_PROTOCOL)
-    with open('{0}/x_test'.format(directory), 'wb') as f:
+    with open(f'{directory}/x_test', 'wb') as f:
         pickle.dump(x_test, f, pickle.HIGHEST_PROTOCOL)
-    with open('{0}/y_test'.format(directory), 'wb') as f:
+    with open(f'{directory}/y_test', 'wb') as f:
         pickle.dump(y_test, f, pickle.HIGHEST_PROTOCOL)
-    with open('{0}/training_configs'.format(directory), 'wb') as f:
+    with open(f'{directory}/training_configs', 'wb') as f:
         pickle.dump(training_configs, f, pickle.HIGHEST_PROTOCOL)
-    with open('{0}/test_configs'.format(directory), 'wb') as f:
+    with open(f'{directory}/test_configs', 'wb') as f:
         pickle.dump(test_configs, f, pickle.HIGHEST_PROTOCOL)
 
 
 def deserialize_data(directory):
-    with open('{0}/x_train'.format(directory), 'rb') as f:
+    with open(f'{directory}/x_train', 'rb') as f:
         x_train = pickle.load(f)
-    with open('{0}/y_train'.format(directory), 'rb') as f:
+    with open(f'{directory}/y_train', 'rb') as f:
         y_train = pickle.load(f)
-    with open('{0}/x_test'.format(directory), 'rb') as f:
+    with open(f'{directory}/x_test', 'rb') as f:
         x_test = pickle.load(f)
-    with open('{0}/y_test'.format(directory), 'rb') as f:
+    with open(f'{directory}/y_test', 'rb') as f:
         y_test = pickle.load(f)
-    with open('{0}/training_configs'.format(directory), 'rb') as f:
+    with open(f'{directory}/training_configs', 'rb') as f:
         training_configs = pickle.load(f)
-    with open('{0}/test_configs'.format(directory), 'rb') as f:
+    with open(f'{directory}/test_configs', 'rb') as f:
         test_configs = pickle.load(f)
     return x_train, y_train, x_test, y_test, training_configs, test_configs
 
@@ -64,7 +81,7 @@ def train_and_save_model(filename, x_train, y_train, x_test, y_test, verbose=Tru
     if len(x_train) < 20:
         bao_logging.warning('Warning: trying to train a Bao model with fewer than 20 datapoints.')
 
-    regression_model = model.BaoRegression(have_cache_data=True, verbose=verbose)
+    regression_model = model.BaoRegression(verbose=verbose)
     losses = regression_model.fit(x_train, y_train, x_test, y_test)
     regression_model.save(filename)
 
@@ -74,8 +91,8 @@ def train_and_save_model(filename, x_train, y_train, x_test, y_test, verbose=Tru
 def evaluate_prediction(y, prediction, plans):
     default_plan = list(filter(lambda x: x.num_disabled_rules == 0, plans))[0]
 
-    bao_logging.info('y:\t%s', '\t'.join(['{:.2f}'.format(_) for _ in y]))
-    bao_logging.info('ŷ:\t%s', '\t'.join('{:.2f}'.format(_[0]) for _ in prediction))
+    bao_logging.info('y:\t%s', '\t'.join([f'{_:.2f}' for _ in y]))
+    bao_logging.info('ŷ:\t%s', '\t'.join(f'{_:.2f}' for _ in prediction))
     min_prediction_index = np.argmin(prediction)
     bao_logging.info('min pred index: %s', str(min_prediction_index))
 
@@ -97,11 +114,11 @@ def evaluate_prediction(y, prediction, plans):
 
 def choose_best_plans(filename, test_configs):
     # load model
-    bao_model = model.BaoRegression(have_cache_data=True, verbose=True)
+    bao_model = model.BaoRegression(verbose=True)
     bao_model.load(filename)
 
     # load query plans for prediction
-    all_query_plans = dict()
+    all_query_plans = {}
     for plan_runtime in test_configs:
         if plan_runtime.query_id in all_query_plans:
             all_query_plans[plan_runtime.query_id].append(plan_runtime)
@@ -148,11 +165,11 @@ def train():
     # calculate absolute improvements
     abs_improv_test = sum([x[3] for x in performance_test])
     abs_test = sum([x[4] for x in performance_test])
-    print('test improvement rel: {:.4f}'.format(abs_improv_test / abs_test))
+    print(f'test improvement rel: {(abs_improv_test / abs_test):.4f}')
 
     abs_improv_test = sum([x[3] for x in performance_training])
     abs_test = sum([x[4] for x in performance_training])
-    print('training improvement rel: {:.4f}'.format(abs_improv_test / abs_test))
+    print(f'training improvement rel: {(abs_improv_test / abs_test):.4f}')
 
 
 if __name__ == '__main__':
