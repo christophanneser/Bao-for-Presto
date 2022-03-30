@@ -1,5 +1,14 @@
 # Bao Integration for Presto
 
+## License
+This prototype implementation is licensed mainly under the 'MIT license' (see LICENSE).
+However, the following files are licensed under AGPLv3 and are copied from https://github.com/learnedsystems/BaoForPostgreSQL:
+- model.py
+- net.py
+- featurize.py
+- storage.py
+- train.py
+
 ## Requirements
 
 ### Modified Presto Server
@@ -39,7 +48,7 @@ The benchmark execution consists of two steps:
 ### Docker
 
 For convenience, we added a Dockerfile that sets up all components properly. However, it is necessary to start a
-postgres instance (e.g. on host system) that can be accessed from the dockerized driver.
+postgres instance (e.g. on host system) that can be accessed from within the containerized driver.
 
 ![Overview](./architecture.png)
 
