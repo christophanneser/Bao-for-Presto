@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-"""Tree convolution neural network used to implement the bandit optimizer (Bao)"""
+"""Wrapper class for the tree convolution neural network used to implement the bandit optimizer (Bao)"""
 from torch import nn
 from tree_conv.tcnn import BinaryTreeConv, TreeLayerNorm
 from tree_conv.tcnn import TreeActivation, DynamicPooling
