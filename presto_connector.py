@@ -41,15 +41,15 @@ def receive_query_span(message, optimizer_type):
     assert optimizer_type in [PrestoOptimizerType.OPTIMIZER, PrestoOptimizerType.RULE]
     if message.startswith(EFFECTIVE):
         if optimizer_type == PrestoOptimizerType.RULE:
-            get_session().status.query_span.effective_rules = json.loads(remove_prefix(message, EFFECTIVE))
+            presto_session.status.query_span.effective_rules = json.loads(remove_prefix(message, EFFECTIVE))
         else:
-            get_session().status.query_span.effective_optimizers = json.loads(remove_prefix(message, EFFECTIVE))
+            presto_session.status.query_span.effective_optimizers = json.loads(remove_prefix(message, EFFECTIVE))
     else:
         assert message.startswith(REQUIRED)
         if optimizer_type == PrestoOptimizerType.RULE:
-            get_session().status.query_span.required_rules = json.loads(remove_prefix(message, REQUIRED))
+            presto_session.status.query_span.required_rules = json.loads(remove_prefix(message, REQUIRED))
         else:
-            get_session().status.query_span.required_optimizers = json.loads(remove_prefix(message, REQUIRED))
+            presto_session.status.query_span.required_optimizers = json.loads(remove_prefix(message, REQUIRED))
 
 
 class PrestoCallbackHandler(socketserver.BaseRequestHandler):
@@ -78,13 +78,13 @@ class PrestoCallbackHandler(socketserver.BaseRequestHandler):
             elif message.startswith(OPTIMIZERS):
                 receive_query_span(remove_prefix(message, OPTIMIZERS), PrestoOptimizerType.OPTIMIZER)
             elif message.startswith(LOGICAL):
-                get_session().status.logical_json = json.loads(remove_prefix(message, LOGICAL))
+                presto_session.status.logical_json = json.loads(remove_prefix(message, LOGICAL))
             elif message.startswith(FRAGMENTED):
-                get_session().status.fragmented_json = json.loads(remove_prefix(message, FRAGMENTED))
+                presto_session.status.fragmented_json = json.loads(remove_prefix(message, FRAGMENTED))
             else:
                 execution_stats = json.loads(message)
-                get_session().status.execution_stats = execution_stats
-                get_session().status.recorded_stats[execution_stats['query_id']] = execution_stats
+                presto_session.status.execution_stats = execution_stats
+                presto_session.status.recorded_stats[execution_stats['query_id']] = execution_stats
         elif message.startswith(DOT):
             dot = remove_prefix(message, DOT)
             if dot.startswith(LOGICAL):
@@ -145,11 +145,4 @@ class PrestoSession:
         self.status = PrestoSession.Status()
 
 
-presto_session = None
-
-
-def get_session():
-    global presto_session
-    if presto_session is None:
-        presto_session = PrestoSession()
-    return presto_session
+presto_session = PrestoSession()

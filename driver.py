@@ -6,7 +6,7 @@ import sys
 
 from arguments_parser import get_parser
 import benchmark
-from presto_connector import get_session
+from presto_connector import presto_session
 from benchmark import TPCH_QUERIES_PATH, JOB_QUERIES_PATH, \
     STACK_QUERIES_PATH, set_presto_config, reset_presto_config, run_get_query_span, run_query_with_optimizer_configs
 import settings
@@ -16,8 +16,8 @@ from session_properties import BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON
 
 def signal_handler(sig, frame):
     """Reset the current presto session in case of unexpected errors"""
-    reset_presto_config(get_session().connection)
-    get_session().callback_server.server_close()
+    reset_presto_config(presto_session.connection)
+    presto_session.callback_server.server_close()
     print(f'Stop driver as it received signal={sig} (frame={frame})! You pressed Ctrl+C! Reset presto configs!')
     sys.exit(0)
 
@@ -25,7 +25,6 @@ def signal_handler(sig, frame):
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
-    presto_session = get_session()
     presto_session.restart_callback_server()
 
     args = get_parser().parse_args()

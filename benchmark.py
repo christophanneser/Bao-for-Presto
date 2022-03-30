@@ -7,7 +7,7 @@ import settings
 import hashlib
 from optimizer_config import OptimizerConfig
 from functools import reduce
-from presto_connector import get_session
+from presto_connector import presto_session
 from custom_logging import bao_logging
 from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES, BAO_ENABLE, BAO_EXECUTE_QUERY, BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON, \
     BAO_EXPORT_TIMES, BAO_GET_QUERY_SPAN
@@ -21,7 +21,7 @@ STACK_QUERIES_PATH = 'queries/stackoverflow/'
 
 
 async def _receive_query_plans_async():
-    callback_server = get_session().callback_server
+    callback_server = presto_session.callback_server
     if settings.EXPORT_GRAPHVIZ:
         bao_logging.info('receive dot plans')
         callback_server.handle_request()
@@ -33,7 +33,7 @@ async def _receive_query_plans_async():
         callback_server.handle_request()
         bao_logging.info('received both json plans')
 
-    status = get_session().status
+    status = presto_session.status
     settings.LOGICAL_DOT = status.logical_dot
     settings.FRAGMENTED_DOT = status.fragmented_dot
     settings.LOGICAL_JSON = status.logical_json
@@ -126,8 +126,8 @@ def run(conn, query_path):
 
 
 def register_query_config_and_measurement(query_path, disabled_rules, cursor=None, initial_call=False, result=None):
-    get_session().callback_server.handle_request()  # wait for execution stats
-    plan_hash = get_session().status.execution_stats['plan_hash']
+    presto_session.callback_server.handle_request()  # wait for execution stats
+    plan_hash = presto_session.status.execution_stats['plan_hash']
     logical_dot = settings.LOGICAL_DOT if settings.EXPORT_GRAPHVIZ else None
     fragmented_dot = settings.FRAGMENTED_DOT if settings.EXPORT_GRAPHVIZ else None
     logical_json = settings.LOGICAL_JSON if settings.EXPORT_JSON else None
@@ -163,7 +163,7 @@ def register_time_measurement(query_path, disabled_rules, cursor, result):
     if not storage.register_query_fingerprint(query_path, result_fingerprint):
         bao_logging.warning('Result fingerprint=%s does not match existing fingerprints!', result_fingerprint)
 
-    status = get_session().status
+    status = presto_session.status
     if not status.execution_stats['query_id'] == cursor.stats['queryId']:
         bao_logging.fatal('WRONG EXECUTION STATS RECEIVED: %s vs %s', status.execution_stats['query_id'], cursor.stats['queryId'])
         status.execution_stats = None
@@ -182,7 +182,7 @@ def register_time_measurement(query_path, disabled_rules, cursor, result):
         cpu=execution_stats['cpu'],
         input_data_size=execution_stats['input_data_size'],
         nodes=cursor.stats['nodes'])
-    get_session().status.execution_stats = None
+    presto_session.status.execution_stats = None
 
 
 def run_query_with_optimizer_configs(connection, query_path):
@@ -249,7 +249,7 @@ def run_get_query_span(connection, query_path):
         # query span comprises 4 components (required/effective rules/optimizers);
         for _ in range(4):
             bao_logging.debug('wait for query span callback ...')
-            get_session().callback_server.handle_request()
+            presto_session.callback_server.handle_request()
             bao_logging.debug('callback received!')
 
     def _get_span_async():
@@ -262,7 +262,7 @@ def run_get_query_span(connection, query_path):
     # asynchronously fetch query spans from presto server
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_get_span_async())
-    query_span = get_session().status.query_span
+    query_span = presto_session.status.query_span
 
     assert query_span.effective_optimizers is not None
     for rule in query_span.effective_optimizers:
