@@ -47,6 +47,8 @@ The benchmark execution consists of two steps:
    ```
 3. By now, the database should be filled with query spans and execution statistics for different plan alternatives.
 
+4. Train BaoNet: todo: description follows
+
 ### Containerization
 
 - For convenience, we added a Dockerfile that sets up all components properly.
@@ -60,6 +62,6 @@ The benchmark execution consists of two steps:
 ## Code Formatting
 
 - All python files will be checked using `pylint` before they can be comitted. The code style is primarily based on
-the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), however, it allows much longer
-lines (160 characters).
+  the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), however, it allows much longer
+  lines (160 characters).
 - Please, install and run pylint (there is also a git pre-commit hook) before committing
