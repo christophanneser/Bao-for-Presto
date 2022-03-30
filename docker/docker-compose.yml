@@ -1,0 +1,17 @@
+services:
+  bao-driver:
+    image: bao:latest
+    environment:
+      - DB_HOST=db
+      - DB_PASSWORD=${PG_PASSWORD}
+      - DB_USER=postgres
+      - DB_NAME=postgres
+      - DB_SCHEMA=public
+    ports:
+      - 8080:8080
+  db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+    ports:
+      - 5432:5432

@@ -1,8 +1,10 @@
 # Bao Integration for Presto
 
 ## License
-This prototype implementation is licensed mainly under the 'MIT license' (see LICENSE).
-However, the following files are licensed under AGPLv3 and are copied from https://github.com/learnedsystems/BaoForPostgreSQL:
+
+This prototype implementation is licensed mainly under the 'MIT license' (see LICENSE). However, the following files are
+licensed under AGPLv3 and are copied from https://github.com/learnedsystems/BaoForPostgreSQL:
+
 - model.py
 - net.py
 - featurize.py
@@ -45,15 +47,19 @@ The benchmark execution consists of two steps:
    ```
 3. By now, the database should be filled with query spans and execution statistics for different plan alternatives.
 
-### Docker
+### Containerization
 
-For convenience, we added a Dockerfile that sets up all components properly. However, it is necessary to start a
-postgres instance (e.g. on host system) that can be accessed from within the containerized driver.
+- For convenience, we added a Dockerfile that sets up all components properly.
+- Please, use the `build.sh` script first, then run `docker-compose config` in the `docker` directory.
+- You must provide an env variable for the postgres password (cf. `docker/run.sh`).
+- Attach to the `bao-presto` container and run the commands shown in the previous section Execution
+- You can monitor the submitted queries (including the session variables) by visiting `localhost:8080`
 
 ![Overview](./architecture.png)
 
 ## Code Formatting
 
-All python files will be checked using `pylint` before they can be comitted. The code style is primarily based on
+- All python files will be checked using `pylint` before they can be comitted. The code style is primarily based on
 the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), however, it allows much longer
 lines (160 characters).
+- Please, install and run pylint (there is also a git pre-commit hook) before committing
