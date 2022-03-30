@@ -26,5 +26,4 @@ RUN cd presto-server && rm -rf etc && ln -sf /presto-config etc
 
 RUN apt-get install vim -y
 
-RUN createdb bao_presto_benchmark
 ENTRYPOINT python3 presto-server/bin/launcher.py run
