@@ -193,7 +193,7 @@ class OptimizerConfig:
 
         commands = list()
         if len(tmp_optimizers) > 0:
-            commands.append(f'SET session {BAO_DISABLED_OPTIMIZERS} = ' + '\'{0}\''.format(','.join(tmp_optimizers)))
+            commands.append(f'''SET session {BAO_DISABLED_OPTIMIZERS} = \'{','.join(tmp_optimizers)}\'''')
         if len(tmp_rules) > 0:
-            commands.append(f'SET session {BAO_DISABLED_RULES} = ' + '\'{0}\''.format(','.join(tmp_rules)))
+            commands.append(f'''SET session {BAO_DISABLED_RULES} = \'{','.join(tmp_rules)}\'''')
         return commands
