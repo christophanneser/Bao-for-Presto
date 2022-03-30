@@ -197,7 +197,6 @@ def experience(benchmark=None, training_ratio=0.8):
     split_index = int(len(keys) * training_ratio)
     train_keys = keys[:split_index]
     test_keys = keys[split_index:]
-    train_keys = test_keys = [1]
 
     train_data = np.concatenate([result[key] for key in train_keys])
     test_data = np.concatenate([result[key] for key in test_keys])

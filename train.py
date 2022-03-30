@@ -92,7 +92,7 @@ def evaluate_prediction(y, prediction, plans):
     default_plan = list(filter(lambda x: x.num_disabled_rules == 0, plans))[0]
 
     bao_logging.info('y:\t%s', '\t'.join([f'{_:.2f}' for _ in y]))
-    bao_logging.info('ŷ:\t%s', '\t'.join(f'{_:.2f}' for _ in prediction))
+    bao_logging.info('ŷ:\t%s', '\t'.join(f'{pred[0]:.2f}' for pred in prediction))
     min_prediction_index = np.argmin(prediction)
     bao_logging.info('min pred index: %s', str(min_prediction_index))
 
