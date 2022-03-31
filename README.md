@@ -12,6 +12,21 @@ This prototype implementation is licensed under the 'MIT license' (see LICENSE).
 - Get release
   from: [Bao-Presto-Integration-Releases](https://github.com/christophanneser/Bao-Presto-Integration/releases)
 
+#### Modifications
+
+- The modified Presto server adds several session properties that allow disabling optimizers/rules and exporting query
+  plans via a pre-defined socket:
+    - `bao_socket`: string [default: localhost:9999]
+    - `graphviz`: boolean [if enabled, presto exports the query plan in dot format via bao_socket]
+    - `json`: boolean [if enabled, presto exports the query plan in json format via bao_socket]
+    - `report_time`: boolean [if enabled, presto exports query runtime stats via bao_socket]
+    - `get_query_span`:
+      boolean [if enabled, presto will calculate the query span of the query and exports it via bao_socket]
+    - `execute_query`:
+      boolean [defines whether the query is executed or not; if disabled, presto runs the query optimization only and does not submit the optimized query plan for execution]
+    - `bao_disabled_optimizers`: string [list of disabled query optimizers, comma separated w/o spaces]
+    - `bao_disabled_rules`: string [list of disabled optimizer rules, comma separated w/o spaces]
+ 
 ### Python3 requirements
 
 - Install python requirements using the file `requirements.txt`
@@ -47,7 +62,7 @@ The benchmark execution consists of two steps:
 - For convenience, we added a Dockerfile that sets up all components properly.
 - Please, use the `build.sh` script first, then run `docker-compose config` in the `docker` directory.
 - You must provide an env variable for the postgres password (cf. `docker/run.sh`).
-- Attach to the `bao-presto` container and run the commands shown in the previous section [Execution](#Execution) 
+- Attach to the `bao-presto` container and run the commands shown in the previous section [Execution](#Execution)
 - You can monitor the submitted queries (including the session variables) here: `localhost:8080`
 
 ![Overview](./architecture.png)
