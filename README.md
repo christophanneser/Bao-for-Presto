@@ -2,14 +2,7 @@
 
 ## License
 
-This prototype implementation is licensed mainly under the 'MIT license' (see LICENSE). However, the following files are
-licensed under AGPLv3 and are copied and slightly modified from https://github.com/learnedsystems/BaoForPostgreSQL:
-
-- model.py
-- net.py
-- featurize.py
-- storage.py
-- train.py
+This prototype implementation is licensed under the 'MIT license' (see LICENSE).
 
 ## Requirements
 
