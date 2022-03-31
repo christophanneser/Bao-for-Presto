@@ -47,8 +47,8 @@ The benchmark execution consists of two steps:
 - For convenience, we added a Dockerfile that sets up all components properly.
 - Please, use the `build.sh` script first, then run `docker-compose config` in the `docker` directory.
 - You must provide an env variable for the postgres password (cf. `docker/run.sh`).
-- Attach to the `bao-presto` container and run the commands shown in the previous section Execution
-- You can monitor the submitted queries (including the session variables) by visiting `localhost:8080`
+- Attach to the `bao-presto` container and run the commands shown in the previous section [Execution](#Execution) 
+- You can monitor the submitted queries (including the session variables) here: `localhost:8080`
 
 ![Overview](./architecture.png)
 
