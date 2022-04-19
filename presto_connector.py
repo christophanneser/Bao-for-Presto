@@ -88,9 +88,9 @@ class PrestoCallbackHandler(socketserver.BaseRequestHandler):
         elif message.startswith(DOT):
             dot = remove_prefix(message, DOT)
             if dot.startswith(LOGICAL):
-                self.server.logical_dot = remove_prefix(dot, LOGICAL)
+                presto_session.status.logical_dot = remove_prefix(dot, LOGICAL)
             elif dot.startswith(FRAGMENTED):
-                self.server.fragmented_dot = remove_prefix(dot, FRAGMENTED)
+                presto_session.status.fragmented_dot = remove_prefix(dot, FRAGMENTED)
         self.request.close()
 
 
