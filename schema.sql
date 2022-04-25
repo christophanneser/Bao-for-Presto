@@ -56,16 +56,17 @@ CREATE TABLE IF NOT EXISTS query_effective_rules
 
 CREATE TABLE IF NOT EXISTS query_optimizer_configs
 (
-    id                  SERIAL PRIMARY KEY,
-    query_id            int REFERENCES queries,
-    disabled_rules      TEXT,
-    logical_plan_dot    TEXT,
-    fragmented_plan_dot TEXT,
-    logical_plan_json   TEXT,
-    fragmented_plan_json TEXT,
-    num_disabled_rules int,
-    hash                int, -- the hash value of the optimizer query plan
-    duplicated_plan     Boolean DEFAULT false,
+    id                      SERIAL PRIMARY KEY,
+    query_id                int REFERENCES queries,
+    disabled_rules          TEXT,
+    unoptimized_plan_dot    TEXT,
+    logical_plan_dot        TEXT,
+    fragmented_plan_dot     TEXT,
+    logical_plan_json       TEXT,
+    fragmented_plan_json    TEXT,
+    num_disabled_rules      int,
+    hash                    int, -- the hash value of the optimizer query plan
+    duplicated_plan         Boolean DEFAULT false,
     UNIQUE (query_id, disabled_rules)
 );
 

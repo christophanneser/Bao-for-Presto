@@ -23,17 +23,18 @@ STACK_QUERIES_PATH = 'queries/stackoverflow/'
 async def _receive_query_plans_async():
     callback_server = presto_session.callback_server
     if settings.EXPORT_GRAPHVIZ:
-        bao_logging.info('receive dot plans')
-        callback_server.handle_request()
-        callback_server.handle_request()
-        bao_logging.info('received both dot plans')
+        bao_logging.info('receive unoptimized, logical, and fragmented dot plans')
+        for _ in range(3):
+            callback_server.handle_request()
+        bao_logging.info('received 3 dot plans')
     if settings.EXPORT_JSON:
-        bao_logging.info('receive json plans')
-        callback_server.handle_request()
-        callback_server.handle_request()
-        bao_logging.info('received both json plans')
+        bao_logging.info('receive logical and fragmented json plans')
+        for _ in range(2):
+            callback_server.handle_request()
+        bao_logging.info('received 2 json plans')
 
     status = presto_session.status
+    settings.CANONICAL_DOT = status.canonical_dot
     settings.LOGICAL_DOT = status.logical_dot
     settings.FRAGMENTED_DOT = status.fragmented_dot
     settings.LOGICAL_JSON = status.logical_json
@@ -128,11 +129,13 @@ def run(conn, query_path):
 def register_query_config_and_measurement(query_path, disabled_rules, cursor=None, initial_call=False, result=None):
     presto_session.callback_server.handle_request()  # wait for execution stats
     plan_hash = presto_session.status.execution_stats['plan_hash']
+    canonical_dot = settings.CANONICAL_DOT if settings.EXPORT_GRAPHVIZ else None
     logical_dot = settings.LOGICAL_DOT if settings.EXPORT_GRAPHVIZ else None
     fragmented_dot = settings.FRAGMENTED_DOT if settings.EXPORT_GRAPHVIZ else None
     logical_json = settings.LOGICAL_JSON if settings.EXPORT_JSON else None
     fragmented_json = settings.FRAGMENTED_JSON if settings.EXPORT_JSON else None
-    is_duplicate = storage.register_query_config(query_path, disabled_rules, logical_dot, fragmented_dot, logical_json, fragmented_json, plan_hash)
+    is_duplicate = storage.register_query_config(query_path, disabled_rules, canonical_dot, logical_dot, fragmented_dot, logical_json, fragmented_json,
+                                                 plan_hash)
     is_duplicate = False  # fixme
     if is_duplicate:
         bao_logging.info('Plan hash already known')
@@ -150,13 +153,13 @@ def register_time_measurement(query_path, disabled_rules, cursor, result):
 
     def hash_sql_result():
         """Generate a hash fingerprint for the result retrieved from presto to assert that results are (probably) identical.
-        Its important to round floats here, e.g. 2 decimal places."""
+        Its important to round floats here, e.g. using 2 decimal places."""
         flattened_result = reduce(operator.concat, result)
         normalized_result = tuple(map(lambda item: round(item, 2) if isinstance(item, float) else item, flattened_result))
         md5 = hashlib.md5()
         for item in normalized_result:
             md5.update(str(item).encode())
-        return md5.digest()  # '{:02x}'.format(md5.digest())
+        return md5.digest()
 
     # check if results match
     result_fingerprint = hash_sql_result()

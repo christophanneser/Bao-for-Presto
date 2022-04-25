@@ -12,6 +12,7 @@ OPTIMIZERS = 'optimizers:'
 RULES = 'rules:'
 EFFECTIVE = 'effective:'
 REQUIRED = 'required:'
+CREATED = 'created:'
 LOGICAL = 'logical:'
 FRAGMENTED = 'fragmented:'
 
@@ -87,7 +88,9 @@ class PrestoCallbackHandler(socketserver.BaseRequestHandler):
                 presto_session.status.recorded_stats[execution_stats['query_id']] = execution_stats
         elif message.startswith(DOT):
             dot = remove_prefix(message, DOT)
-            if dot.startswith(LOGICAL):
+            if dot.startswith(CREATED):
+                presto_session.status.canonical_dot = remove_prefix(dot, CREATED)
+            elif dot.startswith(LOGICAL):
                 presto_session.status.logical_dot = remove_prefix(dot, LOGICAL)
             elif dot.startswith(FRAGMENTED):
                 presto_session.status.fragmented_dot = remove_prefix(dot, FRAGMENTED)
@@ -103,6 +106,7 @@ class PrestoSession:
         def __init__(self):
             self.query_span = QuerySpan()
             self.execution_stats = {}
+            self.canonical_dot = None
             self.logical_dot = None
             self.fragmented_dot = None
             self.logical_json = None

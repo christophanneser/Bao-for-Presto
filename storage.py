@@ -253,7 +253,7 @@ def get_df(query):
         return df
 
 
-def register_query_config(query_path, disabled_rules, logical_dot, fragmented_dot, logical_json, fragmented_json, plan_hash):
+def register_query_config(query_path, disabled_rules, created_dot, logical_dot, fragmented_dot, logical_json, fragmented_json, plan_hash):
     """
     Store the passed query optimizer configuration in the database.
     :returns: query plan is already known and a duplicate
@@ -273,6 +273,7 @@ def register_query_config(query_path, disabled_rules, logical_dot, fragmented_do
             return sqlalchemy.String('').literal_processor(dialect=ENGINE.dialect)(value=str(val))
 
         try:
+            created_dot_processed = literal_processor(created_dot)
             logical_dot_processed = literal_processor(logical_dot)
             fragmented_dot_processed = literal_processor(fragmented_dot)
             logical_json_processed = literal_processor(
@@ -282,10 +283,10 @@ def register_query_config(query_path, disabled_rules, logical_dot, fragmented_do
 
             num_disabled_rules = 0 if disabled_rules is None else disabled_rules.count(',') + 1
             stmt = f"""INSERT INTO query_optimizer_configs
-                   (query_id, disabled_rules, logical_plan_dot, 
+                   (query_id, disabled_rules, unoptimized_plan_dot, logical_plan_dot,
                    fragmented_plan_dot, logical_plan_json, fragmented_plan_json,
                     num_disabled_rules, hash, duplicated_plan) 
-                   SELECT id, '{disabled_rules}', {logical_dot_processed}, {fragmented_dot_processed}, {logical_json_processed}, {fragmented_json_processed}, {num_disabled_rules}, {plan_hash}, {is_duplicate} from queries where query_path = '{query_path}'
+                   SELECT id, '{disabled_rules}', {created_dot_processed}, {logical_dot_processed}, {fragmented_dot_processed}, {logical_json_processed}, {fragmented_json_processed}, {num_disabled_rules}, {plan_hash}, {is_duplicate} from queries where query_path = '{query_path}'
                    """
             conn.execute(stmt)
         except IntegrityError:
