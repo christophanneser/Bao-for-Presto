@@ -11,65 +11,68 @@ FROM (
      ) sub
 $$
     LANGUAGE 'sql' IMMUTABLE;
-
-CREATE or REPLACE AGGREGATE median(numeric) (
-    SFUNC = array_append,
+--------------------------------------------------------------------------------
+CREATE
+OR
+REPLACE
+AGGREGATE median(numeric) (
+    sfunc = array_append,
     STYPE =numeric[],
-    FINALFUNC =_final_median,
-    INITCOND = '{}'
+    finalfunc =_final_median,
+    initcond = '{}'
     );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS queries
 (
     id                 SERIAL PRIMARY KEY,
-    query_path         VARCHAR(256) UNIQUE,
-    result_fingerprint bytea
+    query_path         varchar(256) UNIQUE,
+    result_fingerprint BYTEA
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_required_optimizers
 (
-    query_id INTEGER REFERENCES queries,
+    query_id     INTEGER REFERENCES queries,
     optimizer_id TEXT,
     PRIMARY KEY (query_id, optimizer_id)
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_effective_optimizers
 (
-    query_id INTEGER REFERENCES queries,
+    query_id     INTEGER REFERENCES queries,
     optimizer_id TEXT,
     PRIMARY KEY (query_id, optimizer_id)
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_required_rules
 (
-    query_id int REFERENCES queries,
+    query_id INTEGER REFERENCES queries,
     rule     TEXT,
     PRIMARY KEY (query_id, rule)
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_effective_rules
 (
-    query_id int REFERENCES queries,
+    query_id INTEGER REFERENCES queries,
     rule     TEXT,
     PRIMARY KEY (query_id, rule)
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_optimizer_configs
 (
-    id                      SERIAL PRIMARY KEY,
-    query_id                int REFERENCES queries,
-    disabled_rules          TEXT,
-    unoptimized_plan_dot    TEXT,
-    logical_plan_dot        TEXT,
-    fragmented_plan_dot     TEXT,
-    logical_plan_json       TEXT,
-    fragmented_plan_json    TEXT,
-    num_disabled_rules      int,
-    hash                    int, -- the hash value of the optimizer query plan
-    duplicated_plan         Boolean DEFAULT false,
+    id                   SERIAL PRIMARY KEY,
+    query_id             INTEGER REFERENCES queries,
+    disabled_rules       TEXT,
+    unoptimized_plan_dot TEXT,
+    logical_plan_dot     TEXT,
+    fragmented_plan_dot  TEXT,
+    logical_plan_json    TEXT,
+    fragmented_plan_json TEXT,
+    num_disabled_rules   INTEGER,
+    hash                 INTEGER, -- the hash value of the optimizer query plan
+    duplicated_plan      BOOLEAN DEFAULT FALSE,
     UNIQUE (query_id, disabled_rules)
 );
-
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS measurements
 (
     query_optimizer_config_id INTEGER REFERENCES query_optimizer_configs,
@@ -79,8 +82,9 @@ CREATE TABLE IF NOT EXISTS measurements
     running                   INTEGER,
     finishing                 INTEGER,
     machine                   TEXT,
-    time                      timestamp,
+    time                      TIMESTAMP,
     cpu_time                  DECIMAL,
     input_data_size           BIGSERIAL,
     nodes                     INTEGER
 );
+--------------------------------------------------------------------------------
