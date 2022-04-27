@@ -23,8 +23,8 @@ STACK_QUERIES_PATH = 'queries/stackoverflow/'
 async def _receive_query_plans_async():
     callback_server = presto_session.callback_server
     if settings.EXPORT_GRAPHVIZ:
-        bao_logging.info('receive unoptimized, logical, and fragmented dot plans')
-        for _ in range(3):
+        bao_logging.info('receive logical and fragmented dot (graphviz) plans')
+        for _ in range(2):
             callback_server.handle_request()
         bao_logging.info('received 3 dot plans')
     if settings.EXPORT_JSON:
@@ -34,7 +34,6 @@ async def _receive_query_plans_async():
         bao_logging.info('received 2 json plans')
 
     status = presto_session.status
-    settings.CANONICAL_DOT = status.canonical_dot
     settings.LOGICAL_DOT = status.logical_dot
     settings.FRAGMENTED_DOT = status.fragmented_dot
     settings.LOGICAL_JSON = status.logical_json
@@ -129,14 +128,11 @@ def run(conn, query_path):
 def register_query_config_and_measurement(query_path, disabled_rules, cursor=None, initial_call=False, result=None):
     presto_session.callback_server.handle_request()  # wait for execution stats
     plan_hash = presto_session.status.execution_stats['plan_hash']
-    canonical_dot = settings.CANONICAL_DOT if settings.EXPORT_GRAPHVIZ else None
     logical_dot = settings.LOGICAL_DOT if settings.EXPORT_GRAPHVIZ else None
     fragmented_dot = settings.FRAGMENTED_DOT if settings.EXPORT_GRAPHVIZ else None
     logical_json = settings.LOGICAL_JSON if settings.EXPORT_JSON else None
     fragmented_json = settings.FRAGMENTED_JSON if settings.EXPORT_JSON else None
-    is_duplicate = storage.register_query_config(query_path, disabled_rules, canonical_dot, logical_dot, fragmented_dot, logical_json, fragmented_json,
-                                                 plan_hash)
-    is_duplicate = False  # fixme
+    is_duplicate = storage.register_query_config(query_path, disabled_rules, logical_dot, fragmented_dot, logical_json, fragmented_json, plan_hash)
     if is_duplicate:
         bao_logging.info('Plan hash already known')
     if not (is_duplicate or initial_call):

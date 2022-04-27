@@ -62,7 +62,6 @@ CREATE TABLE IF NOT EXISTS query_optimizer_configs
     id                   SERIAL PRIMARY KEY,
     query_id             INTEGER REFERENCES queries,
     disabled_rules       TEXT,
-    unoptimized_plan_dot TEXT,
     logical_plan_dot     TEXT,
     fragmented_plan_dot  TEXT,
     logical_plan_json    TEXT,
