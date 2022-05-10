@@ -57,7 +57,7 @@ if __name__ == '__main__':
         queries = sorted(list(filter(lambda q: q.endswith('.sql') and q != 'schema_job.sql', os.listdir(JOB_QUERIES_PATH))))
         for query in queries:
             bao_logging.info('run JOB Q%s...', query)
-            RUN_QUERY(presto_session.get_connection(), f'{JOB_QUERIES_PATH}{queries}')
+            RUN_QUERY(presto_session.get_connection(), f'{JOB_QUERIES_PATH}{query}')
     elif args.benchmark == 'stack':
         queries = glob.iglob(STACK_QUERIES_PATH + '**/*.sql', recursive=True)
         for query in list(queries):

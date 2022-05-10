@@ -285,7 +285,7 @@ def register_query_config(query_path, disabled_rules, logical_dot, fragmented_do
 
             num_disabled_rules = 0 if disabled_rules is None else disabled_rules.count(',') + 1
             stmt = f"""INSERT INTO query_optimizer_configs
-                   (query_id, disabled_rules, unoptimized_plan_dot, logical_plan_dot,
+                   (query_id, disabled_rules, logical_plan_dot,
                    fragmented_plan_dot, logical_plan_json, fragmented_plan_json,
                     num_disabled_rules, hash, duplicated_plan) 
                    SELECT id, '{disabled_rules}', {logical_dot_processed}, {fragmented_dot_processed}, {logical_json_processed}, {fragmented_json_processed}, {num_disabled_rules}, {plan_hash}, {is_duplicate} from queries where query_path = '{query_path}'

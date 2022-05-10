@@ -26,7 +26,7 @@ async def _receive_query_plans_async():
         bao_logging.info('receive logical and fragmented dot (graphviz) plans')
         for _ in range(2):
             callback_server.handle_request()
-        bao_logging.info('received 3 dot plans')
+        bao_logging.info('received 2 dot plans')
     if settings.EXPORT_JSON:
         bao_logging.info('receive logical and fragmented json plans')
         for _ in range(2):
