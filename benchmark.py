@@ -5,7 +5,7 @@ import prestodb
 import storage
 import settings
 import hashlib
-from optimizer_config import OptimizerConfig
+from optimizer_config import OptimizerPipeline
 from functools import reduce
 from presto_connector import presto_session
 from custom_logging import bao_logging
@@ -190,18 +190,19 @@ def run_query_with_optimizer_configs(connection, query_path):
 
     set_presto_config(connection, BAO_EXPORT_TIMES, True)
 
-    config = OptimizerConfig(query_path)
+    optimizer_pipeline = OptimizerPipeline(query_path, load_query(query_path))
     num_duplicates = 0
-    while config.has_next():
+    optimizer_pipeline.next()
+    while optimizer_pipeline.has_next():
         enable_all_optimizers_and_rules(connection)
-        optimizer_configs = config.next()
+        optimizer_pipeline.next()
+        optimizer_configs = optimizer_pipeline.get_disabled_opts_rules_commands()
 
         for setting in optimizer_configs:
             set_optimizer_config(connection, setting)
 
         # skip configs which have been executed previously
-        if storage.check_for_existing_measurements(
-            query_path, config.get_disabled_opts_rules()):
+        if storage.check_for_existing_measurements(query_path, optimizer_pipeline.get_disabled_opts_rules()):
             pass  # continue
 
         # check first if this config generates a new query plan (prevent actual execution of plan)
@@ -209,14 +210,14 @@ def run_query_with_optimizer_configs(connection, query_path):
         run(connection, query_path)
         set_presto_config(connection, 'execute_query', True)
 
-        if register_query_config_and_measurement(query_path, config.get_disabled_opts_rules(), initial_call=True):
+        if register_query_config_and_measurement(query_path, optimizer_pipeline.get_disabled_opts_rules(), initial_call=True):
             num_duplicates += 1
             continue
 
-        run_config(config, connection, query_path)
+        run_config(optimizer_pipeline, connection, query_path)
 
     enable_all_optimizers_and_rules(connection)
-    run_config(config, connection, query_path)  # re-run default config with all optimizers being enabled again
+    run_config(optimizer_pipeline, connection, query_path)  # re-run default config with all optimizers being enabled again
 
     bao_logging.info('Found %s duplicated query plans!', num_duplicates)
 
@@ -231,7 +232,7 @@ def run_config(config, conn, query_path):
                 repeat -= 1
                 continue
             else:
-                bao_logging.fatal('Optimizer %s cannot be disabled for %s - skip this config', config.get_disabled_opts_rules(), query_path)
+                bao_logging.fatal('Optimizer %s cannot be disabled for %s - skip this config', config.get_disabled_opts_rules_commands(), query_path)
                 break
 
         if register_query_config_and_measurement(query_path, config.get_disabled_opts_rules(), result=result[0], cursor=result[1]):

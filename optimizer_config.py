@@ -3,9 +3,11 @@ import storage
 import pandasql as pdsql
 import statistics
 import progressbar
+
 from custom_logging import bao_logging
 from presto_query_optimizer import always_required_optimizers, always_required_rules
-from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES
+from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES, RELATION_SEP
+from sql_metadata import Parser
 
 # define early stopping and do not explore all possible optimizer configurations
 MAX_DP_DEPTH = 2
@@ -16,6 +18,51 @@ def tuple_to_list(t):
         return [t[0]]
     else:
         return list(t)
+
+
+class OptimizerPipeline:
+    """We consider one OptimizerConfig per relation in the query plan.
+    Effectively, during logical optimization, presto looks up in which pipeline an operator is and what optimizers/rules are enabled/disabled"""
+
+    def __init__(self, query_path, query_string):
+        """Extract the relations from the sql plan first, then create an OptimizerConfig for each relation"""
+        self.relation = Parser(query_string).tables
+        self.optimizer_configs = {relation: OptimizerConfig(query_path) for relation in self.relation}
+        self.iterator = -1
+
+    def has_next(self):
+        if self.optimizer_configs[self.relation[self.iterator]].has_next():
+            return True
+        return self.iterator < len(self.optimizer_configs) - 1
+
+    def next(self):
+        if self.optimizer_configs[self.relation[self.iterator]].has_next():
+            return self.optimizer_configs[self.relation[self.iterator]].next()
+        self.iterator += 1
+        return self.optimizer_configs[self.relation[self.iterator]].next()
+
+    def get_disabled_opts_rules_commands(self):
+        disabled_optimizers = ''
+        disabled_rules = ''
+        for relation in self.relation:
+            config = self.optimizer_configs[relation].get_disabled_optimizers_rules()
+            disabled_optimizers += f'''{relation}:{','.join(config['disabled_optimizers'])}{RELATION_SEP}'''
+            disabled_rules += f'''{relation}:{','.join(config['disabled_rules'])}{RELATION_SEP}'''
+
+        disabled_optimizers = disabled_optimizers[:-1]
+        disabled_rules = disabled_rules[:-1]
+
+        commands = [f'''SET session {BAO_DISABLED_OPTIMIZERS} = \'{disabled_optimizers}\'''', f'''SET session {BAO_DISABLED_RULES} = \'{disabled_rules}\'''']
+        return commands
+
+    def get_disabled_opts_rules(self):
+        disabled_optimizers = ''
+        disabled_rules = ''
+        for relation in self.relation:
+            config = self.optimizer_configs[relation].get_disabled_optimizers_rules()
+            disabled_optimizers += f'''{relation}:{','.join(config['disabled_optimizers'])}{RELATION_SEP}'''
+            disabled_rules += f'''{relation}:{','.join(config['disabled_rules'])}{RELATION_SEP}'''
+        return disabled_rules + disabled_optimizers
 
 
 class QuerySpan:
@@ -57,7 +104,7 @@ class OptimizerConfig:
 
         self.progress_bar = None
         self.restart_progress_bar()
-        print('\trun {0} different configs'.format(self.get_num_configs()))
+        print(f'\trun {self.get_num_configs()} different configs')
 
     def dp_combine(self, promising_disabled_opts, previous_configs):
         result = set()
@@ -85,22 +132,21 @@ class OptimizerConfig:
         self.progress_bar.start()
 
     def __repr__(self):
-        return 'Config {{\n\toptimizers:{0},\n\trules:{1}}}'.format(
-            self.tunable_optimizers, self.editable_rules)
+        return f'Config {{\n\toptimizers:{self.query_span.get_tunable_optimizers()},\n\trules:{self.query_span.get_tunable_rules()}}}'
 
     def get_measurements(self):
         # we do not consider planning and scheduling time in the total runtime
-        stmt = '''
+        stmt = f'''
             select (running + finishing) as total_runtime, qoc.disabled_rules, m.time, qoc.num_disabled_rules
             from queries q,
                  measurements m,
                  query_optimizer_configs qoc
             where m.query_optimizer_config_id = qoc.id
               and qoc.query_id = q.id
-              and q.query_path = '{0}'
+              and q.query_path = '{self.query_path}'
               and (qoc.num_disabled_rules = 1 or qoc.duplicated_plan = false)
             order by m.time asc;
-            '''.format(self.query_path)
+            '''
         df = storage.get_df(stmt)
         return df
 
@@ -115,13 +161,11 @@ class OptimizerConfig:
                                                 baseline_median,
                                                 baseline_mean):
         measurements = self.get_measurements()
-        stmt = '''select total_runtime, disabled_rules, time
+        stmt = f'''select total_runtime, disabled_rules, time
         from measurements
-        where num_disabled_rules = {0};
-        '''.format(num_disabled_rules)
+        where num_disabled_rules = {num_disabled_rules};'''
         df = pdsql.sqldf(stmt, locals())
-        measurements = df.groupby(['disabled_rules'
-                                   ])['total_runtime'].agg(['median', 'mean'])
+        measurements = df.groupby(['disabled_rules'])['total_runtime'].agg(['median', 'mean'])
 
         # find bad configs and black list them so they are not used in later DP stages
         bad_configs = measurements[(measurements['median'] > baseline_median) |
@@ -187,13 +231,12 @@ class OptimizerConfig:
     def next(self):
         self.iterator += 1
         self.progress_bar.update(self.iterator)
+
+    def get_disabled_optimizers_rules(self):
+        if self.configs is None:
+            return {'disabled_optimizers': [], 'disabled_rules': []}
         conf = self.configs[self.iterator]
         tmp_optimizers = list(filter(lambda x: x in self.query_span.get_tunable_optimizers(), conf))
         tmp_rules = list(filter(lambda x: x in self.query_span.get_tunable_rules(), conf))
 
-        commands = list()
-        if len(tmp_optimizers) > 0:
-            commands.append(f'''SET session {BAO_DISABLED_OPTIMIZERS} = \'{','.join(tmp_optimizers)}\'''')
-        if len(tmp_rules) > 0:
-            commands.append(f'''SET session {BAO_DISABLED_RULES} = \'{','.join(tmp_rules)}\'''')
-        return commands
+        return {'disabled_optimizers': tmp_optimizers, 'disabled_rules': tmp_rules}
