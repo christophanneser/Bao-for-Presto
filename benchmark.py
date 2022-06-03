@@ -1,5 +1,6 @@
 """This module coordinates the query span approximation and the generation of new optimizer configurations for a query"""
 import asyncio
+import json
 import operator
 import prestodb
 import storage
@@ -9,7 +10,7 @@ from optimizer_config import OptimizerConfig
 from functools import reduce
 from presto_connector import presto_session
 from custom_logging import bao_logging
-from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES, BAO_ENABLE, BAO_EXECUTE_QUERY, BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON, \
+from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_ENABLE, BAO_EXECUTE_QUERY, BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON, \
     BAO_EXPORT_TIMES, BAO_GET_QUERY_SPAN
 
 FLIGHTS_QUERIES_PATH = 'queries/flights/'
@@ -103,7 +104,6 @@ def set_presto_config(conn, setting, enable=True):
 
 def enable_all_optimizers_and_rules(conn):
     exec_query(conn, f'SET session {BAO_DISABLED_OPTIMIZERS} = \'\'', set_config_variable=True)
-    exec_query(conn, f'SET session {BAO_DISABLED_RULES} = \'\'', set_config_variable=True)
 
 
 def set_optimizer_config(conn, setting):
@@ -200,8 +200,7 @@ def run_query_with_optimizer_configs(connection, query_path):
             set_optimizer_config(connection, setting)
 
         # skip configs which have been executed previously
-        if storage.check_for_existing_measurements(
-            query_path, config.get_disabled_opts_rules()):
+        if storage.check_for_existing_measurements(query_path, config.get_disabled_opts_rules()):
             pass  # continue
 
         # check first if this config generates a new query plan (prevent actual execution of plan)
@@ -246,7 +245,7 @@ def run_get_query_span(connection, query_path):
 
     async def _receive_span_async():
         # query span comprises 4 components (required/effective rules/optimizers);
-        for _ in range(4):
+        for _ in range(2):
             bao_logging.debug('wait for query span callback ...')
             presto_session.callback_server.handle_request()
             bao_logging.debug('callback received!')
@@ -261,20 +260,16 @@ def run_get_query_span(connection, query_path):
     # asynchronously fetch query spans from presto server
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_get_span_async())
-    query_span = presto_session.status.query_span
 
-    assert query_span.effective_optimizers is not None
-    for rule in query_span.effective_optimizers:
-        storage.register_optimizer(query_path, rule, 'query_effective_optimizers')
+    assert presto_session.status.effective_optimizers is not None
+    for optimizer in presto_session.status.effective_optimizers:  # pylint: disable=not-an-iterable
+        optimizer = json.loads(optimizer)
+        storage.register_optimizer(query_path, optimizer['name'], 'query_effective_optimizers')
+        # consider recursive optimizer dependencies here
+        for dependency in optimizer['dependencies']:
+            storage.register_optimizer_dependency(query_path, optimizer['name'], dependency, 'query_effective_optimizers_dependencies')
 
-    assert query_span.required_optimizers is not None
-    for rule in query_span.required_optimizers:
-        storage.register_optimizer(query_path, rule, 'query_required_optimizers')
-
-    assert query_span.effective_rules is not None
-    for rule in query_span.effective_rules:
-        storage.register_rule(query_path, rule, 'query_effective_rules')
-
-    assert query_span.required_rules is not None
-    for rule in query_span.required_rules:
-        storage.register_rule(query_path, rule, 'query_required_rules')
+    assert presto_session.status.required_optimizers is not None
+    for optimizer in presto_session.status.required_optimizers:  # pylint: disable=not-an-iterable
+        optimizer = json.loads(optimizer)
+        storage.register_optimizer(query_path, optimizer['name'], 'query_required_optimizers')

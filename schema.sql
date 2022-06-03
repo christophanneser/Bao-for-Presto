@@ -32,29 +32,23 @@ CREATE TABLE IF NOT EXISTS queries
 CREATE TABLE IF NOT EXISTS query_required_optimizers
 (
     query_id     INTEGER REFERENCES queries,
-    optimizer_id TEXT,
-    PRIMARY KEY (query_id, optimizer_id)
+    optimizer TEXT,
+    PRIMARY KEY (query_id, optimizer)
 );
 --------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_effective_optimizers
 (
     query_id     INTEGER REFERENCES queries,
-    optimizer_id TEXT,
-    PRIMARY KEY (query_id, optimizer_id)
+    optimizer TEXT,
+    PRIMARY KEY (query_id, optimizer)
 );
 --------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS query_required_rules
+CREATE TABLE IF NOT EXISTS query_effective_optimizers_dependencies
 (
-    query_id INTEGER REFERENCES queries,
-    rule     TEXT,
-    PRIMARY KEY (query_id, rule)
-);
---------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS query_effective_rules
-(
-    query_id INTEGER REFERENCES queries,
-    rule     TEXT,
-    PRIMARY KEY (query_id, rule)
+    query_id     INTEGER REFERENCES queries,
+    optimizer TEXT,
+    dependent_optimizer TEXT, -- dependency of 'optimizer_id'
+    PRIMARY KEY (query_id, optimizer, dependent_optimizer)
 );
 --------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS query_optimizer_configs

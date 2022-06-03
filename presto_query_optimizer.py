@@ -138,3 +138,5 @@ always_required_optimizers = [_add_local_exchanges, _stats_recording_plan_optimi
 # The following rules are required to get correct query plans
 always_required_rules = [_plan_remote_pojections, _push_aggregation_through_outer_join, _push_partial_aggregation_through_exchange,
                          _remove_redundant_identity_projections, _eliminate_cross_joins]
+
+always_required_optimizers += always_required_rules

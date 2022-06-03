@@ -34,7 +34,7 @@ def _db():
 
     schema = os.getenv('DB_SCHEMA')
     conn = ENGINE.connect()
-    conn.execute(f'SET search_path TO {schema}')
+    conn.execute(f'SET search_path TO {schema};')
 
     with open(SCHEMA_FILE, encoding='utf-8') as f:
         schema = f.read()
@@ -71,9 +71,19 @@ def register_query_fingerprint(query_path, fingerprint):
 def register_optimizer(query_path, optimizer, table):
     with _db() as conn:
         try:
-            stmt = text(f'INSERT INTO {table} (query_id, optimizer_id) '
+            stmt = text(f'INSERT INTO {table} (query_id, optimizer) '
                         'SELECT id, :optimizer FROM queries WHERE query_path = :query_path')
             conn.execute(stmt, optimizer=optimizer, query_path=query_path)
+        except IntegrityError:
+            pass  # do not store duplicates
+
+
+def register_optimizer_dependency(query_path, optimizer, dependency, table):
+    with _db() as conn:
+        try:
+            stmt = text(f'INSERT INTO {table} (query_id, optimizer, dependent_optimizer) '
+                        'SELECT id, :optimizer, :dependency FROM queries WHERE query_path = :query_path')
+            conn.execute(stmt, optimizer=optimizer, dependency=dependency, query_path=query_path)
         except IntegrityError:
             pass  # do not store duplicates
 
@@ -128,12 +138,13 @@ def best_alternative_configuration(benchmark=None):
     """
     stmt = stmt.format('' if benchmark is None else benchmark)
 
-    _db()
-    cursor = ENGINE.raw_connection().cursor()
-    schema = os.getenv('DB_SCHEMA')
-    cursor.execute(f'SET search_path TO {schema}')
-    cursor.execute(stmt)
-    return [OptimizerConfigResult(*row) for row in cursor.fetchall()]
+    with _db() as conn:
+        # fixme?
+        # cursor = ENGINE.raw_connection().cursor()
+        # schema = os.getenv('DB_SCHEMA')
+        # cursor.execute(f'SET search_path TO {schema}')
+        cursor = conn.execute(stmt)
+        return [OptimizerConfigResult(*row) for row in cursor.fetchall()]
 
 
 class Measurement:
@@ -162,12 +173,12 @@ def experience(benchmark=None, training_ratio=0.8):
             group by qu.query_path, q.query_id, q.id, q.logical_plan_json, q.disabled_rules, q.num_disabled_rules;"""
     stmt = stmt.format('' if benchmark is None else benchmark)
 
-    _db()
-    cursor = ENGINE.raw_connection().cursor()
-    schema = os.getenv('DB_SCHEMA')
-    cursor.execute(f'SET search_path TO {schema}')
-    cursor.execute(stmt)
-    rows = [Measurement(*row) for row in cursor.fetchall()]
+    with _db() as conn:
+        # cursor = ENGINE.raw_connection().cursor()
+        # schema = os.getenv('DB_SCHEMA')
+        # cursor.execute(f'SET search_path TO {schema}')
+        cursor = conn.execute(stmt)
+        rows = [Measurement(*row) for row in cursor.fetchall()]
 
     # group training and test data by query
     result = {}
@@ -198,55 +209,36 @@ def register_rule(query_path, rule, table):
             pass  # do not store duplicates
 
 
-def get_optimizers(table_name, query_path):
-    with _db() as _:
-        stmt = """
-               SELECT optimizer_id
-               FROM queries q, {0} qro
-               WHERE q.query_path='{1}' AND q.id = qro.query_id
+def get_optimizers(table_name, query_path, projections):
+    with _db() as conn:
+        stmt = f"""
+               SELECT {','.join(projections)}
+               FROM queries q, {table_name} qro
+               WHERE q.query_path='{query_path}' AND q.id = qro.query_id
                """
-        stmt = stmt.format(table_name, query_path)
-        cursor = ENGINE.raw_connection().cursor()
-        cursor.execute(stmt)
-        return [row[0] for row in cursor.fetchall()]
+        cursor = conn.execute(stmt)
+        return cursor.fetchall()
 
 
 def get_required_optimizers(query_path):
-    return get_optimizers('query_required_optimizers', query_path)
+    return list(map(lambda res: res[0], get_optimizers('query_required_optimizers', query_path, ['optimizer'])))
 
 
 def get_effective_optimizers(query_path):
-    return get_optimizers('query_effective_optimizers', query_path)
+    return list(map(lambda res: res[0], get_optimizers('query_effective_optimizers', query_path, ['optimizer'])))
 
 
-def get_rules(table_name, query_path):
-    with _db() as _:
-        stmt = 'SELECT rule ' \
-               'FROM queries q, {0} qro ' \
-               'WHERE q.query_path=\'{1}\' AND q.id = qro.query_id'
-        stmt = stmt.format(table_name, query_path)
-
-        cursor = ENGINE.raw_connection().cursor()
-        cursor.execute(stmt)
-        return [row[0] for row in cursor.fetchall()]
-
-
-def get_required_rules(query_path):
-    return get_rules('query_required_rules', query_path)
-
-
-def get_effective_rules(query_path):
-    return get_rules('query_effective_rules', query_path)
+def get_effective_optimizers_depedencies(query_path):
+    return list(map(lambda res: [res[0], res[1]], get_optimizers('query_effective_optimizers_dependencies', query_path, ['optimizer', 'dependent_optimizer'])))
 
 
 def select_query(query):
-    _db()
-    cursor = ENGINE.raw_connection().cursor()
-
-    schema = os.getenv('DB_SCHEMA')
-    cursor.execute(f'SET search_path TO {schema}')
-    cursor.execute(query)
-    return [row[0] for row in cursor.fetchall()]
+    with _db() as conn:
+        # cursor = ENGINE.raw_connection().cursor()
+        # schema = os.getenv('DB_SCHEMA')
+        # cursor.execute(f'SET search_path TO {schema}')
+        cursor = conn.execute(query)
+        return [row[0] for row in cursor.fetchall()]
 
 
 def get_df(query):
@@ -324,11 +316,7 @@ def register_measurement(query_path, disabled_rules, elapsed, planning, scheduli
 
 
 if __name__ == '__main__':
-    optimizer_ids = get_required_optimizers('queries/tpch/10.sql')
-    print(optimizer_ids)
-    optimizer_ids = get_effective_optimizers('queries/tpch/10.sql')
-    print(optimizer_ids)
-    rules = get_required_rules('queries/tpch/10.sql')
-    print(rules)
-    rules = get_effective_rules('queries/tpch/10.sql')
-    print(rules)
+    optimizers = get_required_optimizers('queries/tpch/10.sql')
+    print(optimizers)
+    optimizers = get_effective_optimizers('queries/tpch/10.sql')
+    print(optimizers)

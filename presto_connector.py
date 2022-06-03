@@ -1,6 +1,5 @@
 """This module provides several helper functions to connect to presto server and to receive messages from Presto via the predefined bao-socket"""
 import prestodb
-from optimizer_config import QuerySpan
 import json
 import struct
 import socketserver
@@ -8,8 +7,7 @@ from enum import Enum
 from custom_logging import bao_logging
 
 # expected presto message prefixes
-OPTIMIZERS = 'optimizers:'
-RULES = 'rules:'
+SPAN = 'span:'
 EFFECTIVE = 'effective:'
 REQUIRED = 'required:'
 LOGICAL = 'logical:'
@@ -37,23 +35,17 @@ def remove_prefix(text, prefix):
     return text[len(prefix):]
 
 
-def receive_query_span(message, optimizer_type):
-    assert optimizer_type in [PrestoOptimizerType.OPTIMIZER, PrestoOptimizerType.RULE]
+def receive_query_span(message):
     if message.startswith(EFFECTIVE):
-        if optimizer_type == PrestoOptimizerType.RULE:
-            presto_session.status.query_span.effective_rules = json.loads(remove_prefix(message, EFFECTIVE))
-        else:
-            presto_session.status.query_span.effective_optimizers = json.loads(remove_prefix(message, EFFECTIVE))
+        # fixme: query span also contains rule dependencies, fix parsing now
+        presto_session.status.effective_optimizers = json.loads(remove_prefix(message, EFFECTIVE))
     else:
         assert message.startswith(REQUIRED)
-        if optimizer_type == PrestoOptimizerType.RULE:
-            presto_session.status.query_span.required_rules = json.loads(remove_prefix(message, REQUIRED))
-        else:
-            presto_session.status.query_span.required_optimizers = json.loads(remove_prefix(message, REQUIRED))
+        presto_session.status.required_optimizers = json.loads(remove_prefix(message, REQUIRED))
 
 
 class PrestoCallbackHandler(socketserver.BaseRequestHandler):
-    """Request handle class to receive and decode all the messages from presto server."""
+    """Request handler class to receive and decode messages from presto server."""
 
     def get_message(self):
         buffer = recvall(self.request, 4)
@@ -73,10 +65,8 @@ class PrestoCallbackHandler(socketserver.BaseRequestHandler):
         if message.startswith(JSON):
             message = remove_prefix(message, JSON)
             message = message.strip()
-            if message.startswith(RULES):
-                receive_query_span(remove_prefix(message, RULES), PrestoOptimizerType.RULE)
-            elif message.startswith(OPTIMIZERS):
-                receive_query_span(remove_prefix(message, OPTIMIZERS), PrestoOptimizerType.OPTIMIZER)
+            if message.startswith(SPAN):
+                receive_query_span(remove_prefix(message, SPAN))
             elif message.startswith(LOGICAL):
                 presto_session.status.logical_json = json.loads(remove_prefix(message, LOGICAL))
             elif message.startswith(FRAGMENTED):
@@ -101,7 +91,8 @@ class PrestoSession:
         """Store the information received from presto"""
 
         def __init__(self):
-            self.query_span = QuerySpan()
+            self.effective_optimizers = None
+            self.required_optimizers = None
             self.execution_stats = {}
             self.logical_dot = None
             self.fragmented_dot = None

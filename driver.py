@@ -66,7 +66,7 @@ if __name__ == '__main__':
             bao_logging.info('run STACK Q%s...', query)
             RUN_QUERY(presto_session.get_connection(), query)
     elif args.benchmark == 'tpch':
-        for query in range(1, 23):
+        for query in range(1, 2):
             if query in [2]:
                 continue
             bao_logging.info('run TPC-H Q%s...', query)

@@ -4,11 +4,11 @@ import pandasql as pdsql
 import statistics
 import progressbar
 from custom_logging import bao_logging
-from presto_query_optimizer import always_required_optimizers, always_required_rules
-from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_DISABLED_RULES
+from presto_query_optimizer import always_required_optimizers
+from session_properties import BAO_DISABLED_OPTIMIZERS
 
 # define early stopping and do not explore all possible optimizer configurations
-MAX_DP_DEPTH = 2
+MAX_DP_DEPTH = 3
 
 
 def tuple_to_list(t):
@@ -21,17 +21,25 @@ def tuple_to_list(t):
 class QuerySpan:
     """This implementation is specific to presto, as it differentiates rules and optimizers"""
 
-    def __init__(self):
-        self.effective_rules = None
-        self.effective_optimizers = None
-        self.required_rules = None
-        self.required_optimizers = None
+    def __init__(self, query_path=None):
+        if query_path is not None:
+            self.query_path = query_path
+            self.effective_optimizers = storage.get_effective_optimizers(self.query_path)
+            self.required_optimizers = storage.get_required_optimizers(self.query_path)
+            self._get_dependencies()
+
+    def _get_dependencies(self):
+        """Alternative optimizers become only effective if their dependencies are also deactivated"""
+        dependencies = storage.get_effective_optimizers_depedencies(self.query_path)
+        self.dependencies = {}
+        for optimizer, dependency in dependencies:
+            if optimizer in self.dependencies:
+                self.dependencies[optimizer].append(dependency)
+            else:
+                self.dependencies[optimizer] = [dependency]
 
     def get_tunable_optimizers(self):
         return sorted(list(set(self.effective_optimizers).difference(self.required_optimizers, always_required_optimizers)))
-
-    def get_tunable_rules(self):
-        return sorted(list(set(self.effective_rules).difference(self.required_rules, always_required_rules)))
 
 
 class OptimizerConfig:
@@ -42,14 +50,8 @@ class OptimizerConfig:
         self.query_path = query_path
         # store configs that resulted in runtimes worse than the baseline
         self.blacklisted_configs = set()
-
-        query_span = QuerySpan()
-        query_span.required_optimizers = storage.get_required_optimizers(self.query_path)
-        query_span.effective_optimizers = storage.get_effective_optimizers(self.query_path)
-        query_span.required_rules = storage.get_required_rules(self.query_path)
-        query_span.effective_rules = storage.get_effective_rules(self.query_path)
-        self.query_span = query_span
-        self.tunable_opts_rules = query_span.get_tunable_optimizers() + query_span.get_tunable_rules()
+        self.query_span = QuerySpan(self.query_path)
+        self.tunable_opts_rules = self.query_span.get_tunable_optimizers()
 
         self.n = 0  # consider 1 rule/optimizer at once
         self.configs = self.get_next_configs()
@@ -57,13 +59,13 @@ class OptimizerConfig:
 
         self.progress_bar = None
         self.restart_progress_bar()
-        print('\trun {0} different configs'.format(self.get_num_configs()))
+        print(f'\trun {self.get_num_configs()} different configs')
 
     def dp_combine(self, promising_disabled_opts, previous_configs):
         result = set()
         # based on previous results, use DP to build new interesting configurations
         for optimizer in promising_disabled_opts:
-            # combine with all other result
+            # combine with all other results
             for conf in previous_configs:
                 if optimizer[0] not in conf:
                     new_config = frozenset(conf + optimizer)
@@ -73,8 +75,16 @@ class OptimizerConfig:
                             execute_config = False
                             break
                     if execute_config:
-                        result.add(frozenset(conf + optimizer))
+                        result.add(new_config)
         return sorted([sorted(list(x)) for x in result])  # key=lambda x: ''.join(x)
+
+    def check_config_for_dependencies(self, config):
+        """Check if there is an an alternative optimizer in the config. If yes, check that all dependencies are disabled as well."""
+        for optimizer in config:
+            if optimizer in self.query_span.dependencies:
+                if not frozenset(self.query_span.dependencies[optimizer]).issubset(config):
+                    return False
+        return True
 
     def restart_progress_bar(self):
         if self.progress_bar is not None:
@@ -85,22 +95,21 @@ class OptimizerConfig:
         self.progress_bar.start()
 
     def __repr__(self):
-        return 'Config {{\n\toptimizers:{0},\n\trules:{1}}}'.format(
-            self.tunable_optimizers, self.editable_rules)
+        return f'Config {{\n\toptimizers:{self.tunable_opts_rules}}}'
 
     def get_measurements(self):
         # we do not consider planning and scheduling time in the total runtime
-        stmt = '''
+        stmt = f'''
             select (running + finishing) as total_runtime, qoc.disabled_rules, m.time, qoc.num_disabled_rules
             from queries q,
                  measurements m,
                  query_optimizer_configs qoc
             where m.query_optimizer_config_id = qoc.id
               and qoc.query_id = q.id
-              and q.query_path = '{0}'
+              and q.query_path = '{self.query_path}'
               and (qoc.num_disabled_rules = 1 or qoc.duplicated_plan = false)
             order by m.time asc;
-            '''.format(self.query_path)
+            '''
         df = storage.get_df(stmt)
         return df
 
@@ -111,17 +120,14 @@ class OptimizerConfig:
         runtimes = runs['total_runtime'].to_list()
         return runtimes
 
-    def get_promising_measurements_by_num_rules(self, num_disabled_rules,
-                                                baseline_median,
-                                                baseline_mean):
+    def get_promising_measurements_by_num_rules(self, num_disabled_rules, baseline_median, baseline_mean):
         measurements = self.get_measurements()
-        stmt = '''select total_runtime, disabled_rules, time
+        stmt = f'''select total_runtime, disabled_rules, time
         from measurements
-        where num_disabled_rules = {0};
-        '''.format(num_disabled_rules)
+        where num_disabled_rules = {num_disabled_rules};
+        '''
         df = pdsql.sqldf(stmt, locals())
-        measurements = df.groupby(['disabled_rules'
-                                   ])['total_runtime'].agg(['median', 'mean'])
+        measurements = df.groupby(['disabled_rules'])['total_runtime'].agg(['median', 'mean'])
 
         # find bad configs and black list them so they are not used in later DP stages
         bad_configs = measurements[(measurements['median'] > baseline_median) |
@@ -155,7 +161,7 @@ class OptimizerConfig:
                 median = statistics.median(baseline)
                 mean = statistics.mean(baseline)
                 # get results from previous runs, consider only those configs better than the baseline
-                single_optimizers = self.get_promising_measurements_by_num_rules(1, median, mean)
+                single_optimizers = self.get_promising_measurements_by_num_rules(1, median, mean) + [[key] for key in self.query_span.dependencies]
                 combinations_previous_run = self.get_promising_measurements_by_num_rules(n - 1, median, mean)
                 # use configs from n-1 and combine with n=1
                 configs = self.dp_combine(single_optimizers, combinations_previous_run)
@@ -163,6 +169,8 @@ class OptimizerConfig:
                 bao_logging.info('DP: get_next_configs() results in an ArithmeticError %s', err)
                 configs = None
         self.n += 1
+        # remove those configs where an optimizer exists that has unfulfilled dependencies (e.g. its dependencies are not part of the config)
+        configs = list(filter(self.check_config_for_dependencies, configs))
         return configs
 
     def get_num_configs(self):
@@ -179,7 +187,7 @@ class OptimizerConfig:
         self.configs = self.get_next_configs()
         if self.configs is None:
             return False
-        bao_logging.info('Enter next DP stage, run %s configurations', len(self.configs))
+        bao_logging.info('Enter next DP stage, execute for %s hint sets/configurations', len(self.configs))
         self.restart_progress_bar()
         self.iterator = -1
         return self.iterator < self.get_num_configs() - 1
@@ -189,11 +197,8 @@ class OptimizerConfig:
         self.progress_bar.update(self.iterator)
         conf = self.configs[self.iterator]
         tmp_optimizers = list(filter(lambda x: x in self.query_span.get_tunable_optimizers(), conf))
-        tmp_rules = list(filter(lambda x: x in self.query_span.get_tunable_rules(), conf))
 
-        commands = list()
+        commands = []
         if len(tmp_optimizers) > 0:
             commands.append(f'''SET session {BAO_DISABLED_OPTIMIZERS} = \'{','.join(tmp_optimizers)}\'''')
-        if len(tmp_rules) > 0:
-            commands.append(f'''SET session {BAO_DISABLED_RULES} = \'{','.join(tmp_rules)}\'''')
         return commands
