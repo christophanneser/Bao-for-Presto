@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS query_effective_optimizers_dependencies
 (
     query_id     INTEGER REFERENCES queries,
     optimizer TEXT,
-    dependent_optimizer TEXT, -- dependency of 'optimizer_id'
+    dependent_optimizer TEXT, -- dependency of 'optimizer'
     PRIMARY KEY (query_id, optimizer, dependent_optimizer)
 );
 --------------------------------------------------------------------------------

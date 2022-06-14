@@ -1,6 +1,5 @@
 """This module coordinates the query span approximation and the generation of new optimizer configurations for a query"""
 import asyncio
-import json
 import operator
 import prestodb
 import storage
@@ -263,7 +262,6 @@ def run_get_query_span(connection, query_path):
 
     assert presto_session.status.effective_optimizers is not None
     for optimizer in presto_session.status.effective_optimizers:  # pylint: disable=not-an-iterable
-        optimizer = json.loads(optimizer)
         storage.register_optimizer(query_path, optimizer['name'], 'query_effective_optimizers')
         # consider recursive optimizer dependencies here
         for dependency in optimizer['dependencies']:
@@ -271,5 +269,4 @@ def run_get_query_span(connection, query_path):
 
     assert presto_session.status.required_optimizers is not None
     for optimizer in presto_session.status.required_optimizers:  # pylint: disable=not-an-iterable
-        optimizer = json.loads(optimizer)
         storage.register_optimizer(query_path, optimizer['name'], 'query_required_optimizers')

@@ -16,6 +16,14 @@ SCHEMA_FILE = 'schema.sql'
 ENGINE = None
 
 
+def read_sql_file(filename, encoding='utf-8') -> str:
+    """Read SQL file, remove comments, and return a list of sql statements as a string"""
+    with open(filename, encoding=encoding) as f:
+        file = f.read()
+    statements = file.split('\n')
+    return '\n'.join(filter(lambda line: not line.startswith('--'), statements))
+
+
 def _db():
     global ENGINE
     if ENGINE is None:
@@ -36,10 +44,7 @@ def _db():
     conn = ENGINE.connect()
     conn.execute(f'SET search_path TO {schema};')
 
-    with open(SCHEMA_FILE, encoding='utf-8') as f:
-        schema = f.read()
-    schema = schema.split('\n')
-    schema = '\n'.join(filter(lambda line: not line.startswith('--'), schema))
+    schema = read_sql_file(SCHEMA_FILE)
 
     for statement in schema.split(';'):
         if len(statement.strip()) > 0:
