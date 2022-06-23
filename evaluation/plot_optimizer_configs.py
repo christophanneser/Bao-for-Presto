@@ -1,5 +1,5 @@
 """This module plots the relative and absolute runtime improvements wrt. the default QEP from Presto"""
-from benchmark_plotter import style, texify
+from benchmark_plotter import style, texify, colors
 import storage
 from matplotlib.colors import LinearSegmentedColormap
 import re
@@ -7,18 +7,18 @@ import os
 import random
 import matplotlib.pyplot as plt
 import matplotlib.text as mtext
-
-storage.SCHEMA_FILE = '../schema.sql'
+from performance_prediction import PerformancePrediction
 
 green = '#013220'
 white = '#FFFFFF'
 red = '#8b1f24'
-optimal_color = '#32cd32'
-predicted_color = red
+optimal_color = 'gray'  # '#32cd32'
+predicted_color = colors.colors['lightblue']
 
 colormap = LinearSegmentedColormap.from_list('Custom', [green, '#32cd32', white], N=1200)
-OVERHEADS = LinearSegmentedColormap.from_list('Custom', [white, red], N=1200)
+OVERHEAD = LinearSegmentedColormap.from_list('Custom', [white, red], N=1200)
 LABEL_REGEX = re.compile(r'.*/(\w*-?\w*)\.sql')
+OUTPUT_DIR = 'evaluation/figures'
 
 
 class LegendTitle(object):
@@ -96,7 +96,7 @@ def plot_performance(benchmark, results, experiment_type='absolute'):
             col = colormap(idx)
         else:
             idx = int(abs(get_key(result) / lowest) * 1000) + 200
-            col = OVERHEADS(idx)
+            col = OVERHEAD(idx)
 
         ax.bar([i], [get_key(result)], width=1., linewidth=0., color=col)
 
@@ -112,108 +112,101 @@ def plot_performance(benchmark, results, experiment_type='absolute'):
     ax.set_xlim([-1, len(results)])
 
     fig.subplots_adjust(bottom=0.2)
-    fig.savefig(f'runtime_savings_{experiment_type}_{benchmark}.pgf')
-    fig.savefig(f'runtime_savings_{experiment_type}_{benchmark}.pdf')
-    crop_figure(f'runtime_savings_{experiment_type}_{benchmark}.pdf')
+    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pgf')
+    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pdf')
+    crop_figure(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pdf')
 
 
-# def plot_learned_performance(benchmark, test, training, show_training=True):
-#    """test contains data [[best,predicted,queryname]]"""
-#    # relative or absolute
-#    optimal = 0  # 0
-#    learned = optimal + 1  # 1
-#    scale = -0.001 if optimal == 2 else -100
-#
-#    test = [list(t) + ['test'] for t in test]
-#    training = [list(t) + ['train'] for t in training]
-#    all = test + training
-#    all = sorted(all, key=lambda x: -x[0])
-#    texify.latexify(6, 2.2)
-#
-#    style.set_custom_style()
-#    fig, ax = plt.subplots(nrows=1, ncols=1)
-#
-#    alpha = 1.0
-#    width = 1.0
-#
-#    for i, measurement in enumerate(all):
-#        if measurement[6] == 'train':
-#            if not show_training:
-#                continue
-#            optimal_train = ax.bar([i],
-#                                   scale * float(measurement[optimal]),
-#                                   width=width,
-#                                   label='Optimal [Train]',
-#                                   color=optimal_color,
-#                                   alpha=alpha,
-#                                   linewidth=0.)
-#            predicted_train = ax.bar([i],
-#                                     scale * float(measurement[learned]),
-#                                     width=width,
-#                                     label='Bao [Train]',
-#                                     color=predicted_color,
-#                                     alpha=alpha,
-#                                     linewidth=0.)
-#            if scale * float(measurement[learned]) > 0:
-#                print('overplot')
-#                optimal_train = ax.bar([i],
-#                                       scale * float(measurement[optimal]),
-#                                       width=width,
-#                                       label='Optimal',
-#                                       color=optimal_color,
-#                                       alpha=alpha,
-#                                       linewidth=0.)
-#        else:
-#            optimal_test = ax.bar([i],
-#                                  scale * float(measurement[optimal]),
-#                                  width=width,
-#                                  label='Optimal',
-#                                  color=optimal_color,
-#                                  alpha=None,
-#                                  linewidth=0.)
-#            predicted_test = ax.bar([i],
-#                                    scale * float(measurement[learned]),
-#                                    width=width,
-#                                    label='Bao',
-#                                    color=predicted_color,
-#                                    alpha=None,
-#                                    linewidth=0.)
-#            if scale * float(measurement[learned]) > 0:
-#                print('overplot')
-#                optimal_test = ax.bar([i],
-#                                      scale * float(measurement[optimal]),
-#                                      width=width,
-#                                      label='Optimal',
-#                                      color=optimal_color,
-#                                      alpha=None,
-#                                      linewidth=0.)
-#
-#    # handles = ['Unseen', optimal_test, predicted_test, 'Seen', optimal_train, predicted_train]
-#
-#    handles = [optimal_test, predicted_test]
-#    ax.set_ylabel('\\textbf{{{0}}}~Runtime Changes [{1}]'.format(
-#        'Relative' if optimal == 0 else 'Absolute',
-#        '\\%' if optimal == 0 else 's'))
-#    # ax.set_yscale('log')
-#    ax.set_xlabel('Queries')
-#    ax.set_ylim([-44, 36])
-#    ax.set_xlim([-1, len(all)])
-#    ax.set_xticks([])
-#    # ax.set_title('Optimal Query Optimizer Configurations ({0})'.format(str.upper(benchmark)))
-#    ax.legend(handles=handles, loc='lower right')
-#    ax.legend(handles, ['', 'Optimal', 'Bao', '', 'Optimal', 'Bao'],
-#              handler_map={basestring: LegendTitle({'fontsize': 9})}, ncol=2, title=r'\textbf{Queries}',
-#              handlelength=0.5, columnspacing=1.5)
-#
-#    plt.xticks(rotation=90)
-#    ax.set_xticks(range(len(query_infos)))
-#    ax.set_xticklabels(list(map(lambda entry: process_query_label(entry), query_infos)))
-#
-#    # save to pdf and pgf
-#    experiment_type = 'rel' if optimal == 2 else 'rel'
-#    fig.savefig(f'''runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pgf''')
-#    fig.savefig(f'''runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pdf''')
-#    crop_figure(f'''runtime_savings_learned_{experiment_type}_{benchmark}.pdf''')
+def plot_learned_performance(benchmark: str, test: list[PerformancePrediction], training: list[PerformancePrediction], show_training=True):
+    absolute = False  # relative or absolute runtime changes wrt. default plan
+    scale = -0.00001 if absolute else -100
+
+    all_data: list[PerformancePrediction] = test + training
+    all_data = sorted(all_data, key=lambda x: -x.selected_plan_relative_improvement)
+    texify.latexify(6, 2.2)
+
+    style.set_custom_style()
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+
+    alpha = 0.1  # draw training set with lower alpha values as this data is already known to the TCNN model
+    width = 1.0
+
+    for i, measurement in enumerate(all_data):
+        if measurement.is_training_sample:
+            if not show_training:  # skip training data
+                continue
+            # optimal alternative hint set
+            ax.bar([i],
+                   scale * float(measurement.best_plan_relative_improvement),
+                   width=width,
+                   label='Optimal [Train]',
+                   color=optimal_color,
+                   alpha=alpha,
+                   linewidth=0.)
+            # predicted optimal plan
+            ax.bar([i],
+                   scale * float(measurement.selected_plan_relative_improvement),
+                   width=width,
+                   label='Bao [Train]',
+                   color=predicted_color,
+                   alpha=alpha,
+                   linewidth=0.)
+            if scale * float(measurement.selected_plan_relative_improvement) > 0:
+                # plot the optimal training measurement
+                ax.bar([i],
+                       scale * float(measurement.best_plan_relative_improvement),
+                       width=width,
+                       label='Optimal',
+                       color=optimal_color,
+                       alpha=alpha,
+                       linewidth=0.)
+        else:
+
+            optimal_test = ax.bar([i],
+                                  scale * float(measurement.best_plan_relative_improvement),
+                                  width=width,
+                                  label='Optimal',
+                                  color=optimal_color,
+                                  alpha=None,
+                                  linewidth=0.)
+            predicted_test = ax.bar([i],
+                                    scale * float(measurement.selected_plan_relative_improvement),
+                                    width=width,
+                                    label='Bao',
+                                    color=predicted_color,
+                                    alpha=None,
+                                    linewidth=0.)
+            # re-plot bars which are not visible anymore
+            if scale * float(measurement.selected_plan_relative_improvement) > 0:
+                optimal_test = ax.bar([i],
+                                      scale * float(measurement.best_plan_relative_improvement),
+                                      width=width,
+                                      label='Optimal',
+                                      color=optimal_color,
+                                      alpha=None,
+                                      linewidth=0.)
+
+    handles = [optimal_test, predicted_test]
+    ax.set_ylabel(f'''\\textbf{{{'Relative' if not absolute else 'Absolute'}}}~Runtime Changes [{'%' if not absolute else 's'}]''')
+    ax.set_xlabel('Queries')
+    ax.set_ylim([-44, 36])
+    ax.set_xlim([-1, len(all_data)])
+    ax.set_xticks([])
+    ax.set_title(f'Optimal Query Optimizer Configurations ({benchmark})')
+    ax.legend(handles=handles, loc='lower right')
+    ax.legend(handles, ['Optimal', 'Bao'],
+              handler_map={str: LegendTitle({'fontsize': 9})}, ncol=2, title=r'\textbf{Queries}',
+              handlelength=0.5, columnspacing=1.5)
+
+    plt.xticks(rotation=90)
+    # ax.set_xticks(range(len(query_infos)))
+    # ax.set_xticklabels(list(map(lambda entry: process_query_label(entry), query_infos)))
+
+    # save to pdf and pgf
+    experiment_type = 'rel' if not absolute else 'abs'
+    # fig.savefig(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pgf''')
+    fig.savefig(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pdf''')
+    # crop_figure(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}.pdf''')
 
 
 if __name__ == '__main__':

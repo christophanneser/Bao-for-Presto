@@ -29,4 +29,4 @@ axes.set_ylabel(r'\#~rules')
 
 axes.bar(x=labels, height=_avg.values[0], yerr=yerr.values, capsize=2, color=[colors.colors['blue'], colors.colors['lightorange'], colors.colors['red']])
 
-plt.savefig('evaluation/rule_distributions.pdf', bbox_inches='tight')  # ,  #, bbox_inches='tight') bbox_extra_artist=(legend, fig_text,),
+plt.savefig('evaluation/figures/rule_distributions.pdf', bbox_inches='tight')  # ,  #, bbox_inches='tight') bbox_extra_artist=(legend, fig_text,),
