@@ -104,7 +104,7 @@ def best_alternative_configuration(benchmark=None):
             self.disabled_rules = disabled_rules
             self.rank = rank
 
-    stmt = """
+    stmt = f"""
        with default_plans (query_path, running_time) as (
         select q.query_path, median(m.running + m.finishing)
         from queries q,
@@ -138,17 +138,11 @@ def best_alternative_configuration(benchmark=None):
     select *
     from results
     where rank = 1
-    and query_path like '%{0}%'
-    order by savings desc; 
-    """
-    stmt = stmt.format('' if benchmark is None else benchmark)
+    and query_path like '%%{'' if benchmark is None else benchmark}%%'
+    order by savings desc;"""
 
     with _db() as conn:
-        # fixme?
-        # cursor = ENGINE.raw_connection().cursor()
-        # schema = os.getenv('DB_SCHEMA')
-        # cursor.execute(f'SET search_path TO {schema}')
-        cursor = conn.execute(stmt)
+        cursor = conn.execute(stmt, )
         return [OptimizerConfigResult(*row) for row in cursor.fetchall()]
 
 
