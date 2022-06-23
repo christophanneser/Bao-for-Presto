@@ -6,9 +6,12 @@ class PerformancePrediction:
 
     def __init__(self, default_plan_runtime, selected_plan_runtime, best_plan_runtime, query_path, is_training_sample=False):
         self.default_plan_runtime = default_plan_runtime
-        self.selected_plan_runtime = selected_plan_runtime  # chosen by Bao
-        self.best_plan_runtime = best_plan_runtime  # the best configuration for this query
+        self.selected_plan_runtime = selected_plan_runtime  # the plan that has the estimated best runtime (using Bao)
+        self.best_plan_runtime = best_plan_runtime  # the overall best configuration for this query, validated by experiment
         self.query_path = query_path
-        self.relative_improvement = (default_plan_runtime - selected_plan_runtime) / default_plan_runtime
-        self.absolute_improvement = (default_plan_runtime - selected_plan_runtime)
+        # Performance improvements for the by Bao selected plan and the best plan wrt. the default plan
+        self.selected_plan_relative_improvement = (default_plan_runtime - selected_plan_runtime) / default_plan_runtime
+        self.selected_plan_absolute_improvement = (default_plan_runtime - selected_plan_runtime)
+        self.best_plan_relative_improvement = (default_plan_runtime - best_plan_runtime) / default_plan_runtime
+        self.best_plan_absolute_improvement = (default_plan_runtime - best_plan_runtime)
         self.is_training_sample = is_training_sample

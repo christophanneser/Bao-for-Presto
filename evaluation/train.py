@@ -6,6 +6,7 @@ import numpy as np
 import pickle
 from custom_logging import bao_logging
 from plot_optimizer_configs import plot_learned_performance
+from performance_prediction import PerformancePrediction
 
 
 class BaoTrainingException(Exception):
@@ -72,15 +73,16 @@ def train_and_save_model(filename, x_train, y_train, x_test, y_test, verbose=Tru
     return regression_model, losses
 
 
-def evaluate_prediction(y, prediction, plans):
+def evaluate_prediction(y, predictions, plans, query_path, is_training) -> PerformancePrediction:
     default_plan = list(filter(lambda x: x.num_disabled_rules == 0, plans))[0]
 
     bao_logging.info('y:\t%s', '\t'.join([f'{_:.2f}' for _ in y]))
-    bao_logging.info('ŷ:\t%s', '\t'.join(f'{pred[0]:.2f}' for pred in prediction))
-    min_prediction_index = np.argmin(prediction)
-    bao_logging.info('min pred index: %s', str(min_prediction_index))
+    bao_logging.info('ŷ:\t%s', '\t'.join(f'{prediction[0]:.2f}' for prediction in predictions))
+    # the plan index which is estimated to perform best by Bao
+    min_prediction_index = np.argmin(predictions)
+    bao_logging.info('min predicted index: %s (smaller is better)', str(min_prediction_index))
 
-    # evaluate performance gains
+    # evaluate performance gains with Bao
     performance_from_model = y[min_prediction_index]
     bao_logging.info('best choice -> %s', str(y[0] / default_plan.running_time))
 
@@ -89,14 +91,12 @@ def evaluate_prediction(y, prediction, plans):
     else:
         bao_logging.info('bad choice -> %s', str(performance_from_model / default_plan.running_time))
 
-    return [(default_plan.running_time - y[0]) / default_plan.running_time,
-            (default_plan.running_time - y[min_prediction_index]) /
-            default_plan.running_time, default_plan.running_time - y[0],
-            default_plan.running_time - y[min_prediction_index],
-            default_plan.running_time]
+    return PerformancePrediction(default_plan.running_time, plans[min_prediction_index].running_time, plans[0].running_time, query_path, is_training)
 
 
-def choose_best_plans(filename, test_configs):
+def choose_best_plans(filename: str, test_configs: list[storage.Measurement], is_training: bool) -> list[PerformancePrediction]:
+    """For each query, let Bao estimate the performance of all QEPs and compare them to the runtime of the default plan"""
+
     # load model
     bao_model = model.BaoRegression(verbose=True)
     bao_model.load(filename)
@@ -109,25 +109,26 @@ def choose_best_plans(filename, test_configs):
         else:
             all_query_plans[plan_runtime.query_id] = [plan_runtime]
 
-    performance = []
+    performance_predictions: list[PerformancePrediction] = []
 
     for query_id in sorted(all_query_plans.keys()):
         plans_and_estimates = all_query_plans[query_id]
         plans_and_estimates = sorted(plans_and_estimates, key=lambda record: record.running_time)
+        query_path = plans_and_estimates[0].query_path
 
         bao_logging.info('Preprocess data for query %s', plans_and_estimates[0].query_path)
         x = [x.plan_json for x in plans_and_estimates]
         y = [x.running_time for x in plans_and_estimates]
 
         predictions = bao_model.predict(x)
-        actual, predicted, actual_abs_improve, predicated_abs_improve, default_abs = evaluate_prediction(y, predictions, plans_and_estimates)
-        performance.append((actual, predicted, actual_abs_improve, predicated_abs_improve, default_abs, plans_and_estimates[0].query_path))
-    return reversed(sorted(performance, key=lambda entry: entry[0]))
+        performance_prediction = evaluate_prediction(y, predictions, plans_and_estimates, query_path, is_training)
+        performance_predictions.append(performance_prediction)
+    return list(reversed(sorted(performance_predictions, key=lambda entry: entry.selected_plan_relative_improvement)))
 
 
 def train():
     benchmark = 'job'
-    retrain = True
+    retrain = False
 
     if retrain:
         x_train, y_train, x_test, y_test, training_data, test_data = load_data(benchmark=benchmark, training_ratio=0.8)
@@ -136,26 +137,26 @@ def train():
     else:
         x_train, y_train, x_test, y_test, training_data, test_data = deserialize_data('data')
 
-    performance_test = list(choose_best_plans('model', test_data))
+    performance_test = choose_best_plans('model', test_data, is_training=False)
     # actual_test = list(map(lambda e: float(e[0]), performance_test))
     # learned_test = list(map(lambda e: float(e[1]), performance_test))
     # query_infos_test = list(map(lambda e: e[2], performance_test))
 
-    performance_training = list(choose_best_plans('model', training_data))
+    performance_training = choose_best_plans('model', training_data, is_training=True)
     # actual_test = list(map(lambda e: float(e[0]), performance_training))
     # learned_test = list(map(lambda e: float(e[1]), performance_training))
     # query_infos_test = list(map(lambda e: e[2], performance_training))
 
     # calculate absolute improvements
-    abs_improv_test = sum([x[3] for x in performance_test])
-    abs_test = sum([x[4] for x in performance_test])
-    print(f'test improvement rel: {(abs_improv_test / abs_test):.4f}')
+    abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_test])
+    abs_test = sum([x.default_plan_runtime for x in performance_test])
+    print(f'test improvement rel: {(abs_improvements_test / abs_test):.4f}')
 
-    abs_improv_test = sum([x[3] for x in performance_training])
-    abs_test = sum([x[4] for x in performance_training])
-    print(f'training improvement rel: {(abs_improv_test / abs_test):.4f}')
+    abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_training])
+    abs_test = sum([x.default_plan_runtime for x in performance_training])
+    print(f'training improvement rel: {(abs_improvements_test / abs_test):.4f}')
 
-    plot_learned_performance('JOB', performance_test, performance_training)
+    # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
     plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
 
 

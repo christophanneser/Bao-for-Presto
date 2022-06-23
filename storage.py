@@ -163,19 +163,15 @@ class Measurement:
 
 def experience(benchmark=None, training_ratio=0.8):
     """Get experience to train BAO"""
-    stmt = """select qu.query_path, q.query_id, q.id,  q.disabled_rules, q.num_disabled_rules, q.logical_plan_json, median(running+finishing), median(cpu_time)
+    stmt = f"""select qu.query_path, q.query_id, q.id,  q.disabled_rules, q.num_disabled_rules, q.logical_plan_json, median(running+finishing), median(cpu_time)
             from measurements m, query_optimizer_configs q, queries qu
             where m.query_optimizer_config_id = q.id
               and q.logical_plan_json != 'None' 
               and qu.id = q.query_id
-              and qu.query_path ILIKE '%{0}%'
+              and qu.query_path ILIKE '%%{'' if benchmark is None else benchmark}%%'
             group by qu.query_path, q.query_id, q.id, q.logical_plan_json, q.disabled_rules, q.num_disabled_rules;"""
-    stmt = stmt.format('' if benchmark is None else benchmark)
 
     with _db() as conn:
-        # cursor = ENGINE.raw_connection().cursor()
-        # schema = os.getenv('DB_SCHEMA')
-        # cursor.execute(f'SET search_path TO {schema}')
         cursor = conn.execute(stmt)
         rows = [Measurement(*row) for row in cursor.fetchall()]
 
@@ -233,9 +229,6 @@ def get_effective_optimizers_depedencies(query_path):
 
 def select_query(query):
     with _db() as conn:
-        # cursor = ENGINE.raw_connection().cursor()
-        # schema = os.getenv('DB_SCHEMA')
-        # cursor.execute(f'SET search_path TO {schema}')
         cursor = conn.execute(query)
         return [row[0] for row in cursor.fetchall()]
 

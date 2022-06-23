@@ -12,8 +12,8 @@ from performance_prediction import PerformancePrediction
 green = '#013220'
 white = '#FFFFFF'
 red = '#8b1f24'
-optimal_color = 'gray'  # '#32cd32'
-predicted_color = colors.colors['lightblue']
+optimal_color = colors.colors['orange']
+predicted_color = colors.colors['blue']
 
 colormap = LinearSegmentedColormap.from_list('Custom', [green, '#32cd32', white], N=1200)
 OVERHEAD = LinearSegmentedColormap.from_list('Custom', [white, red], N=1200)
@@ -123,12 +123,12 @@ def plot_learned_performance(benchmark: str, test: list[PerformancePrediction], 
 
     all_data: list[PerformancePrediction] = test + training
     all_data = sorted(all_data, key=lambda x: -x.selected_plan_relative_improvement)
-    texify.latexify(6, 2.2)
+    texify.latexify(6.9, 2.2)
 
     style.set_custom_style()
     fig, ax = plt.subplots(nrows=1, ncols=1)
 
-    alpha = 0.1  # draw training set with lower alpha values as this data is already known to the TCNN model
+    alpha = 0.2  # draw training set with lower alpha values as this data is already known to the TCNN model
     width = 1.0
 
     for i, measurement in enumerate(all_data):
@@ -192,15 +192,15 @@ def plot_learned_performance(benchmark: str, test: list[PerformancePrediction], 
     ax.set_ylim([-44, 36])
     ax.set_xlim([-1, len(all_data)])
     ax.set_xticks([])
-    ax.set_title(f'Optimal Query Optimizer Configurations ({benchmark})')
+    # ax.set_title(f'Relative Performance Changes wrt.\ Default Plan for Optimal and Bao ({benchmark})')
     ax.legend(handles=handles, loc='lower right')
     ax.legend(handles, ['Optimal', 'Bao'],
               handler_map={str: LegendTitle({'fontsize': 9})}, ncol=2, title=r'\textbf{Queries}',
               handlelength=0.5, columnspacing=1.5)
 
+    ax.set_xticks(range(len(all_data)))
+    ax.set_xticklabels(list(map(lambda entry: process_query_label(entry.query_path), all_data)))
     plt.xticks(rotation=90)
-    # ax.set_xticks(range(len(query_infos)))
-    # ax.set_xticklabels(list(map(lambda entry: process_query_label(entry), query_infos)))
 
     # save to pdf and pgf
     experiment_type = 'rel' if not absolute else 'abs'
