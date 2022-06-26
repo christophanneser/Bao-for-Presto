@@ -1,10 +1,8 @@
 """This module plots the relative and absolute runtime improvements wrt. the default QEP from Presto"""
 from benchmark_plotter import style, texify, colors
-import storage
 from matplotlib.colors import LinearSegmentedColormap
 import re
 import os
-import random
 import matplotlib.pyplot as plt
 import matplotlib.text as mtext
 from performance_prediction import PerformancePrediction
@@ -69,9 +67,8 @@ def autolabel(axis, rects, xpos='center', color='black'):
             rotation=90)
 
 
-def plot_performance(benchmark, results, experiment_type='absolute'):
-    # sample a uniform subset of queries for readability
-    indicies = random.sample(range(len(results)), int(0.6 * len(results)))
+def plot_performance(bench: str, results, sample: list[int], experiment_type='absolute'):
+    """Plot the performance improvements of different hint sets wrt. the default runtime of Presto"""
 
     # relative or absolute
     scale = -0.001 if experiment_type == 'absolute' else -100
@@ -83,7 +80,7 @@ def plot_performance(benchmark, results, experiment_type='absolute'):
         else:
             return scale * float(entry.runtime_baseline - entry.runtime)
 
-    results = list(sorted([results[i] for i in indicies], key=get_key))
+    results = list(sorted([results[i] for i in sample], key=get_key))
     highest, lowest = float(get_key(results[0])), float(get_key(results[-1]))
 
     texify.latexify(8.5, 2.3)
@@ -112,18 +109,20 @@ def plot_performance(benchmark, results, experiment_type='absolute'):
     ax.set_xlim([-1, len(results)])
 
     fig.subplots_adjust(bottom=0.2)
-    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pgf')
-    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pdf')
-    crop_figure(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{benchmark}.pdf')
+    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{bench}.pgf')
+    fig.savefig(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{bench}.pdf')
+    crop_figure(f'{OUTPUT_DIR}/runtime_savings_{experiment_type}_{bench}.pdf')
 
 
 def plot_learned_performance(benchmark: str, test: list[PerformancePrediction], training: list[PerformancePrediction], show_training=True):
+    """Plot the performance improvements of different hint sets and the hint set chosen by Bao wrt. the default runtime of Presto"""
     absolute = False  # relative or absolute runtime changes wrt. default plan
     scale = -0.00001 if absolute else -100
 
     all_data: list[PerformancePrediction] = test + training
-    all_data = sorted(all_data, key=lambda x: -x.selected_plan_relative_improvement)
-    texify.latexify(6.9, 2.2)
+    all_data = sorted(all_data, key=lambda x: -x.best_plan_relative_improvement)
+
+    texify.latexify(8.5, 2.3)
 
     style.set_custom_style()
     fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -190,27 +189,19 @@ def plot_learned_performance(benchmark: str, test: list[PerformancePrediction], 
     ax.set_ylabel(f'''\\textbf{{{'Relative' if not absolute else 'Absolute'}}}~Runtime Changes [{'%' if not absolute else 's'}]''')
     ax.set_xlabel('Queries')
     ax.set_ylim([-44, 36])
-    ax.set_xlim([-1, len(all_data)])
+    ax.set_xlim([-1, len(all_data) + 1])
     ax.set_xticks([])
     # ax.set_title(f'Relative Performance Changes wrt.\ Default Plan for Optimal and Bao ({benchmark})')
     ax.legend(handles=handles, loc='lower right')
-    ax.legend(handles, ['Optimal', 'Bao'],
-              handler_map={str: LegendTitle({'fontsize': 9})}, ncol=2, title=r'\textbf{Queries}',
+    ax.legend(handles, ['Best Performance', 'Bao'],
+              handler_map={str: LegendTitle({'fontsize': 9})}, ncol=2, title=r'\textbf{Alternative QEP selected by\dots}',
               handlelength=0.5, columnspacing=1.5)
 
     ax.set_xticks(range(len(all_data)))
     ax.set_xticklabels(list(map(lambda entry: process_query_label(entry.query_path), all_data)))
     plt.xticks(rotation=90)
 
-    # save to pdf and pgf
+    # save to pdf
     experiment_type = 'rel' if not absolute else 'abs'
-    # fig.savefig(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pgf''')
     fig.savefig(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pdf''')
-    # crop_figure(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}.pdf''')
-
-
-if __name__ == '__main__':
-    for queries in ['job']:
-        best_alternative_configs = storage.best_alternative_configuration(queries)
-        plot_performance(queries, best_alternative_configs, 'relative')
-        plot_performance(queries, best_alternative_configs, 'absolute')
+    crop_figure(f'''{OUTPUT_DIR}/runtime_savings_learned_{experiment_type}_{benchmark}{'' if show_training else '_test'}.pdf''')
