@@ -1,4 +1,5 @@
 """This module trains and evaluates the Bao integration for Presto"""
+import json
 import os
 import storage
 import model
@@ -8,6 +9,8 @@ from custom_logging import bao_logging
 from plot_optimizer_configs import plot_performance, plot_learned_performance
 from performance_prediction import PerformancePrediction
 import random
+from copy import deepcopy
+from presto_query_plan.plan_fields import ESTIMATES
 
 
 class BaoTrainingException(Exception):
@@ -94,10 +97,12 @@ def evaluate_prediction(y, predictions, plans, query_path, is_training) -> Perfo
 
     # best alternative configuration is either the first or second one
     best_alt_plan_running_time = plans[0].running_time if plans[0].num_disabled_rules > 0 else plans[1].running_time
-    return PerformancePrediction(default_plan.running_time, plans[min_prediction_index].running_time, best_alt_plan_running_time, query_path, is_training)
+    return PerformancePrediction(default_plan.running_time, plans[min_prediction_index].running_time,
+                                 best_alt_plan_running_time, query_path, is_training)
 
 
-def choose_best_plans(filename: str, test_configs: list[storage.Measurement], is_training: bool) -> list[PerformancePrediction]:
+def choose_best_plans(filename: str, test_configs: list[storage.Measurement], is_training: bool) -> list[
+    PerformancePrediction]:
     """For each query, let Bao estimate the performance of all QEPs and compare them to the runtime of the default plan"""
 
     # load model
@@ -129,16 +134,62 @@ def choose_best_plans(filename: str, test_configs: list[storage.Measurement], is
     return list(reversed(sorted(performance_predictions, key=lambda entry: entry.selected_plan_relative_improvement)))
 
 
-def train(bench: str, considered_queries_in_plot: list[str]):
+def remove_estimates_helper(qep: dict):
+    if ESTIMATES in qep.keys():
+        del qep[ESTIMATES]
+    if 'children' in qep.keys():
+        for child in qep['children']:
+            remove_estimates_helper(child)
+
+
+def remove_estimates(datasets: list[list[str]]) -> list[list[str]]:
+    """Remove all estimates from the given query plans"""
+    for dataset in datasets:
+        result = []
+        for qep in dataset:
+            qep = json.loads(qep)
+            remove_estimates_helper(qep)
+            result.append(json.dumps(qep))
+        yield result
+
+
+def remove_estimates_from_measurements(datasets: list[list[storage.Measurement]]) -> list[list[storage.Measurement]]:
+    for dataset in datasets:
+        result = []
+        for measurement in dataset:
+            measurement = deepcopy(measurement)
+            qep = json.loads(measurement.plan_json)
+            remove_estimates_helper(qep)
+            measurement.plan_json = qep
+            result.append(measurement)
+        yield result
+
+
+def train(bench: str, considered_queries_in_plot: list[str], run_without_estimates=False):
     model_name = 'model'
-    retrain = False
+    model_name_no_estimates = 'model'
+    data_dir = 'data'
+    data_dir_no_estimates = 'data'
+    retrain = True
 
     if retrain:
         x_train, y_train, x_test, y_test, training_data, test_data = load_data(bench, training_ratio=0.8)
-        serialize_data('data', x_train, y_train, x_test, y_test, training_data, test_data)
-        train_and_save_model(model_name, x_train, y_train, x_test, y_test)
+        serialize_data(data_dir, x_train, y_train, x_test, y_test, training_data, test_data)
+        # train_and_save_model(model_name, x_train, y_train, x_test, y_test)
+
+        # remove the estimates from the data and the model to see how estimates impact Baos accuracy
+        if run_without_estimates:
+            x_train_no_estimates, x_test_no_estimates = remove_estimates([x_train, x_test])
+            training_data_no_estimates, test_data_no_estimates = remove_estimates_from_measurements(
+                [training_data, test_data])
+            serialize_data(data_dir_no_estimates, x_train_no_estimates, y_train, x_test_no_estimates, y_test,
+                           training_data_no_estimates,
+                           test_data_no_estimates)
+            train_and_save_model(model_name_no_estimates, x_train_no_estimates, y_train, x_test_no_estimates, y_test)
+
+
     else:
-        x_train, y_train, x_test, y_test, training_data, test_data = deserialize_data('data')
+        x_train, y_train, x_test, y_test, training_data, test_data = deserialize_data(data_dir)
 
     performance_test = choose_best_plans(model_name, test_data, is_training=False)
     performance_training = choose_best_plans(model_name, training_data, is_training=True)
@@ -153,8 +204,11 @@ def train(bench: str, considered_queries_in_plot: list[str]):
     print(f'training improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
 
     # sample down before plotting
-    performance_test = list(filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot, performance_test))
-    performance_training = list(filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot, performance_training))
+    performance_test = list(
+        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot, performance_test))
+    performance_training = list(
+        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
+               performance_training))
 
     # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
     plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
@@ -173,4 +227,4 @@ if __name__ == '__main__':
 
         # 2nd: Plot Bao predicted best hint sets and compare to the best hint sets
         queries_for_plotting = [best_alternative_configs[i].path for i in indicies]
-        train(benchmark, queries_for_plotting)
+        train(benchmark, queries_for_plotting, run_without_estimates=True)

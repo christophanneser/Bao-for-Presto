@@ -60,7 +60,7 @@ def collate(x):
         targets.append(target)
 
     # pylint: disable=not-callable
-    targets = torch.tensor(targets)
+    targets = torch.tensor(np.array(targets))
     return trees, targets
 
 

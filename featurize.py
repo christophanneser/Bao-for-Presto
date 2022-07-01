@@ -1,7 +1,8 @@
 """Preprocess Presto json query plans before passing them to Bao"""
 import numpy as np
 from custom_logging import bao_logging
-from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, \
+from presto_query_plan.operators import BINARY_OPERATORS, ENCODED_TYPES, FILTER, PROJECT, SCAN_FILTER, \
+    SCAN_FILTER_PROJECT, SCAN_PROJECT, TABLE_SCAN, \
     UNARY_OPERATORS, \
     LEAF_TYPES
 from presto_query_plan.malformed_plan import MalformedQueryPlanException
@@ -150,10 +151,10 @@ def _get_plan_stats(data):
     costs = np.log(costs + 1)
     rows = np.log(rows + 1)
 
-    costs_min = np.min(costs)
-    costs_max = np.max(costs)
-    rows_min = np.min(rows)
-    rows_max = np.max(rows)
+    costs_min = np.min(costs) if len(costs) > 0 else 0
+    costs_max = np.max(costs) if len(costs) > 0 else 1
+    rows_min = np.min(rows) if len(costs) > 0 else 0
+    rows_max = np.max(rows) if len(costs) > 0 else 1
 
     return StatExtractor([CPU_COST, ROWS], [costs_min, rows_min], [costs_max, rows_max])
 
@@ -194,38 +195,44 @@ def _attach_buf_data(tree):
 
 
 def _preprocess_scan_filter_project(plan):
-    assert len(plan['estimates']) == 3
     scan_node = {
         NODE_TYPE: TABLE_SCAN,
-        'estimates': plan['estimates'][0],
     }
     filter_node = {
         NODE_TYPE: FILTER,
-        'estimates': plan['estimates'][1],
         CHILDREN: [scan_node],
     }
     plan[NODE_TYPE] = PROJECT
-    plan[ESTIMATES] = plan[ESTIMATES][2]
     plan[CHILDREN] = [filter_node]
     plan[PREPROCESSED] = True
 
+    # add estimates if available
+    if ESTIMATES in plan.keys() and len(plan[ESTIMATES]) == 3:
+        scan_node[ESTIMATES] = plan[ESTIMATES][0]
+        filter_node[ESTIMATES] = plan[ESTIMATES][1]
+        plan[ESTIMATES] = plan[ESTIMATES][2]
+
 
 def _preprocess_scan_project(plan):
-    assert len(plan['estimates']) == 2
-    scan_node = {NODE_TYPE: TABLE_SCAN, 'estimates': plan['estimates'][0]}
+    scan_node = {NODE_TYPE: TABLE_SCAN}
     plan[NODE_TYPE] = PROJECT
-    plan['estimates'] = plan['estimates'][1]
     plan[CHILDREN] = [scan_node]
     plan[PREPROCESSED] = True
+
+    if ESTIMATES in plan.keys() and len(plan[ESTIMATES]) == 2:
+        scan_node[ESTIMATES] = plan[ESTIMATES][0]
+        plan[ESTIMATES] = plan[ESTIMATES][1]
 
 
 def _preprocess_scan_filter(plan):
-    assert len(plan['estimates']) == 2
-    scan_node = {NODE_TYPE: TABLE_SCAN, 'estimates': plan['estimates'][0]}
+    scan_node = {NODE_TYPE: TABLE_SCAN}
     plan[NODE_TYPE] = FILTER
-    plan['estimates'] = plan['estimates'][1]
     plan[CHILDREN] = [scan_node]
     plan[PREPROCESSED] = True
+
+    if ESTIMATES in plan.keys() and len(plan[ESTIMATES]) == 2:
+        scan_node[ESTIMATES] = plan[ESTIMATES][0]
+        plan[ESTIMATES] = plan[ESTIMATES][1]
 
 
 class TreeFeaturizer:
@@ -262,8 +269,7 @@ class TreeFeaturizer:
             elif len(plan[ESTIMATES]) == 1:
                 plan[ESTIMATES] = plan[ESTIMATES][0]
             else:
-                raise MalformedQueryPlanException(
-                    'Multiple estimates for node!')
+                raise MalformedQueryPlanException('Multiple estimates for node!')
 
         plan[PREPROCESSED] = True
         if CHILDREN in plan:
