@@ -167,15 +167,15 @@ def remove_estimates_from_measurements(datasets: list[list[storage.Measurement]]
 
 def train(bench: str, considered_queries_in_plot: list[str], run_without_estimates=False):
     model_name = 'model'
-    model_name_no_estimates = 'model'
     data_dir = 'data'
-    data_dir_no_estimates = 'data'
+    model_name_no_estimates = 'model_no_estimates'
+    data_dir_no_estimates = 'data_no_estimates'
     retrain = True
 
     if retrain:
         x_train, y_train, x_test, y_test, training_data, test_data = load_data(bench, training_ratio=0.8)
         serialize_data(data_dir, x_train, y_train, x_test, y_test, training_data, test_data)
-        # train_and_save_model(model_name, x_train, y_train, x_test, y_test)
+        train_and_save_model(model_name, x_train, y_train, x_test, y_test)
 
         # remove the estimates from the data and the model to see how estimates impact Baos accuracy
         if run_without_estimates:
@@ -183,39 +183,48 @@ def train(bench: str, considered_queries_in_plot: list[str], run_without_estimat
             training_data_no_estimates, test_data_no_estimates = remove_estimates_from_measurements(
                 [training_data, test_data])
             serialize_data(data_dir_no_estimates, x_train_no_estimates, y_train, x_test_no_estimates, y_test,
-                           training_data_no_estimates,
-                           test_data_no_estimates)
+                           training_data_no_estimates, test_data_no_estimates)
             train_and_save_model(model_name_no_estimates, x_train_no_estimates, y_train, x_test_no_estimates, y_test)
 
 
     else:
         x_train, y_train, x_test, y_test, training_data, test_data = deserialize_data(data_dir)
+        if run_without_estimates:
+            x_train_no_estimates, y_train_no_estimates, x_test, y_test, training_data, test_data = \
+                deserialize_data(data_dir_no_estimates)
+            print(y_train_no_estimates)
 
-    performance_test = choose_best_plans(model_name, test_data, is_training=False)
-    performance_training = choose_best_plans(model_name, training_data, is_training=True)
+    # todo run with and without estimates
+    configs = [(model_name, test_data, training_data),
+               (model_name_no_estimates, test_data_no_estimates, training_data_no_estimates)]
 
-    # calculate absolute improvements
-    abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_test])
-    abs_test = sum([x.default_plan_runtime for x in performance_test])
-    print(f'test improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
+    for model_dir, test_data, training_data in configs:
+        performance_test = choose_best_plans(model_dir, test_data, is_training=False)
+        performance_training = choose_best_plans(model_dir, training_data, is_training=True)
 
-    abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_training])
-    abs_test = sum([x.default_plan_runtime for x in performance_training])
-    print(f'training improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
+        # calculate absolute improvements
+        abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_test])
+        abs_test = sum([x.default_plan_runtime for x in performance_test])
+        print(f'test improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
 
-    # sample down before plotting
-    performance_test = list(
-        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot, performance_test))
-    performance_training = list(
-        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
-               performance_training))
+        abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_training])
+        abs_test = sum([x.default_plan_runtime for x in performance_training])
+        print(f'training improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
 
-    # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
-    plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
+        # sample down before plotting
+        performance_test = list(
+            filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
+                   performance_test))
+        performance_training = list(
+            filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
+                   performance_training))
+
+        # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
+        plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
 
 
 if __name__ == '__main__':
-    for benchmark in ['job']:
+    for benchmark in ['job', 'stack' ]:
         best_alternative_configs = storage.best_alternative_configuration(benchmark)
 
         # sample a uniform subset of queries for readability
