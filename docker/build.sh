@@ -1,12 +1,20 @@
 #!/bin/sh
 
-# archive bao sources which will be copied into the container
-(cd .. &&\
-    tar -czf bao.tar.gz *.py presto_query_plan queries tree_conv schema.sql requirements.txt &&\
-    mv bao.tar.gz docker)
+# archive bao sources which will be copied into the container (without pytorch)
+(
+    cd .. &&\
+    cp requirements.txt minimal_requirements.txt && sed -i '/torch/d' minimal_requirements.txt &&\
+    tar -czf bao.tar.gz *.py presto_query_plan queries tree_conv schema.sql minimal_requirements.txt &&\
+    mv bao.tar.gz docker && cp docker/bao.tar.gz Bao-Presto-Integration/Docker/bao.tar.gz
 
-# get presto server release
-wget -N https://github.com/christophanneser/Bao-Presto-Integration/releases/download/v0.237-bao/presto-server.tar.gz
+)
 
-# build bao-presto container
-docker build . -f Dockerfile -t bao:latest
+# build presto server from submodule
+(
+    cd ../Bao-Presto-Integration &&\
+    ./package-presto-for-docker.sh &&\
+    cd Docker &&\
+    ./build.sh
+)
+
+

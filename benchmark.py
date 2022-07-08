@@ -10,7 +10,8 @@ from functools import reduce
 from presto_connector import presto_session
 from custom_logging import bao_logging
 from session_properties import BAO_DISABLED_OPTIMIZERS, BAO_ENABLE, BAO_EXECUTE_QUERY, BAO_EXPORT_GRAPHVIZ, BAO_EXPORT_JSON, \
-    BAO_EXPORT_TIMES, BAO_GET_QUERY_SPAN
+    BAO_EXPORT_TIMES, BAO_GET_QUERY_SPAN, BAO_QUERY_SPAN_ITERATIVE
+import time
 
 FLIGHTS_QUERIES_PATH = 'queries/flights/'
 TAXI_QUERIES_PATH = 'queries/taxi/'
@@ -237,10 +238,11 @@ def run_config(config, conn, query_path):
             break
 
 
-def run_get_query_span(connection, query_path):
+def run_get_query_span(connection, query_path, iterative: bool = True):
     """Given the presto connection and the path to a sql file, get the query span and store it in the database"""
 
     set_presto_config(connection, BAO_GET_QUERY_SPAN, True)
+    set_presto_config(connection, BAO_QUERY_SPAN_ITERATIVE, iterative)
 
     async def _receive_span_async():
         # query span comprises 4 components (required/effective rules/optimizers);
@@ -258,7 +260,18 @@ def run_get_query_span(connection, query_path):
 
     # asynchronously fetch query spans from presto server
     loop = asyncio.get_event_loop()
+
+    # measure the time it takes to calculate the query span
+    start = time.time()
     loop.run_until_complete(_get_span_async())
+    end = time.time()
+
+    effective = list(filter(lambda optimizer: len(optimizer['dependencies']) == 0, presto_session.status.effective_optimizers))
+    alternatives = list(filter(lambda optimizer: len(optimizer['dependencies']) > 0, presto_session.status.effective_optimizers))
+    required = presto_session.status.required_optimizers
+
+    with open(f'''./evaluation/query_span_system_{'iterative' if iterative else 'batch'}.csv''', 'a', encoding='utf-8') as results_file:
+        results_file.write(f'job/{query_path},{end - start},{len(effective)},{len(required)},{len(alternatives)}\n')
 
     assert presto_session.status.effective_optimizers is not None
     for optimizer in presto_session.status.effective_optimizers:  # pylint: disable=not-an-iterable

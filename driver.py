@@ -1,6 +1,5 @@
 """ Documentation: """
 import os
-import glob
 import signal
 import sys
 
@@ -59,10 +58,11 @@ if __name__ == '__main__':
             bao_logging.info('run JOB Q%s...', query)
             RUN_QUERY(presto_session.get_connection(), f'{JOB_QUERIES_PATH}{query}')
     elif args.benchmark == 'stack':
-        queries = glob.iglob(STACK_QUERIES_PATH + '**/*.sql', recursive=True)
+        with open(STACK_QUERIES_PATH + 'stack_queries.txt', 'r', encoding='utf-8') as f:
+            queries = list(map(lambda line: line.replace('\n', ''), f.readlines()))
+
         for query in list(queries):
-            if query.endswith('schema.sql'):
-                continue
+            query = STACK_QUERIES_PATH + query
             bao_logging.info('run STACK Q%s...', query)
             RUN_QUERY(presto_session.get_connection(), query)
     elif args.benchmark == 'tpch':

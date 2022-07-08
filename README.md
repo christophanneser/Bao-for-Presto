@@ -65,7 +65,7 @@ The benchmark execution consists of two steps:
 - Attach to the `bao-presto` container and run the commands shown in the previous section [Execution](#Execution)
 - You can monitor the submitted queries (including the session variables) here: `localhost:8080`
 
-![Overview](./architecture.png)
+![Overview](./overview.png)
 
 ## Code Formatting
 

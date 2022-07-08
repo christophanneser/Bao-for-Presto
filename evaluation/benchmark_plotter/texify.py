@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def latexify(fig_width=None, fig_height=None, columns=1, width_heigth_ratio=None):
+def latexify(fig_width=None, fig_height=None, columns=1, width_heigth_ratio=None, custom_params=None):
     """Set up matplotlib's RC params for LaTeX plotting.
     Call this before plotting a figure.
 
@@ -60,8 +60,11 @@ def latexify(fig_width=None, fig_height=None, columns=1, width_heigth_ratio=None
               'figure.figsize': [fig_width, fig_height],
               'font.family': 'serif',
               'pgf.preamble': [
-                  r'\usepackage{xcolor}', r'\usepackage{xfrac}', r'\usepackage{tikz}' ]
+                  r'\usepackage{xcolor}', r'\usepackage{xfrac}', r'\usepackage{tikz}']
               }
+    if custom_params is not None:
+        for k, v in custom_params.items():
+            params[k] = v
     plt.rcParams.update(params)
 
 

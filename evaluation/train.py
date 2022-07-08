@@ -206,25 +206,43 @@ def train(bench: str, considered_queries_in_plot: list[str], run_without_estimat
         abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_test])
         abs_test = sum([x.default_plan_runtime for x in performance_test])
         print(f'test improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
+    # todo evaluate also the improvmenets of the best hint sets here!!!
+    performance_test = choose_best_plans(model_name, test_data, is_training=False)
+    performance_training = choose_best_plans(model_name, training_data, is_training=True)
 
-        abs_improvements_test = sum([x.selected_plan_absolute_improvement for x in performance_training])
-        abs_test = sum([x.default_plan_runtime for x in performance_training])
-        print(f'training improvement rel: {(abs_improvements_test / float(abs_test)):.4f}')
+    # calculate absolute improvements for test and training sets
+    def calc_improvements(dataset: list):
+        abs_runtime_bao = float(sum([x.selected_plan_runtime for x in dataset]))
+        abs_runtime_best_hs = float(sum([x.best_alt_plan_runtime for x in dataset]))
+        abs_runtime_test_default_plan = float(sum([x.default_plan_runtime for x in dataset]))
 
-        # sample down before plotting
-        performance_test = list(
-            filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
-                   performance_test))
-        performance_training = list(
-            filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
-                   performance_training))
+        print(f'overall runtime of default plans: {abs_runtime_test_default_plan}')
+        print(f'overall runtime of bao selected plans: {abs_runtime_bao}')
+        print(f'overall runtime of best hs plans: {abs_runtime_best_hs}')
+        print(f'test improvement rel w/ bao: {1.0 - (abs_runtime_bao / float(abs_runtime_test_default_plan)):.4f}')
+        print(f'test improvement abs w/ bao: {abs_runtime_bao - abs_runtime_test_default_plan}')
+        print(f'test improvement rel of best alternative hs: {1.0 - (abs_runtime_best_hs / float(abs_runtime_test_default_plan)):.4f}')
+        print(f'test improvement abs of best alternative hs: {abs_runtime_best_hs - abs_runtime_test_default_plan}')
 
-        # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
-        plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
+    print('TEST SET')
+    calc_improvements(performance_test)
+    print('TRAINING SET')
+    calc_improvements(performance_training)
+
+    # sample down before plotting
+    performance_test = list(
+        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
+               performance_test))
+    performance_training = list(
+        filter(lambda performance_pred: performance_pred.query_path in considered_queries_in_plot,
+               performance_training))
+
+    # plot_learned_performance('JOB', performance_test, performance_training, show_training=False)
+    plot_learned_performance('JOB', performance_test, performance_training, show_training=True)
 
 
 if __name__ == '__main__':
-    for benchmark in ['job', 'stack' ]:
+    for benchmark in ['job', 'stack']:
         best_alternative_configs = storage.best_alternative_configuration(benchmark)
 
         # sample a uniform subset of queries for readability
@@ -234,6 +252,6 @@ if __name__ == '__main__':
         plot_performance(benchmark, best_alternative_configs, indicies, 'relative')
         plot_performance(benchmark, best_alternative_configs, indicies, 'absolute')
 
-        # 2nd: Plot Bao predicted best hint sets and compare to the best hint sets
+        # 2nd: Plot Bao predicted best hint sets and compare to the actual best hint sets
         queries_for_plotting = [best_alternative_configs[i].path for i in indicies]
         train(benchmark, queries_for_plotting, run_without_estimates=True)

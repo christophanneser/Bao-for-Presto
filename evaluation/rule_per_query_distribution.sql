@@ -19,4 +19,5 @@ select q.query_path,
            from query_effective_optimizers_dependencies qeod
            where qeod.query_id = q.id
        ) as alternative_rules
-from queries q;
+from queries q
+where q.query_path like '%%job%%';

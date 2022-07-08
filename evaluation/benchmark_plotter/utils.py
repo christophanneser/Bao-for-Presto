@@ -27,3 +27,29 @@ def custom_annotation(axis, text, text_position_relative, arrow_position, color,
     text = axis.texts.pop()
     axis.figure.texts.append(text)
     plt.setp(text, multialignment='center')
+
+
+_abbreviations = [
+    ['Outputs', 'Out'],
+    ['Expressions', 'Expr'],
+    ['Simplify', 'Simp'],
+    ['TableScan', 'TS'],
+    ['Columns', 'Cols'],
+    ['HashGeneration', 'HashGen'],
+    ['None', 'Default'],
+    ['Unreferenced', 'Unref'],
+    ['Optimizer', 'Opt'],
+    ['Predicate', 'Pred'],
+    ['Projections', 'Proj'],
+    ['References', 'Refs'],
+    ['CrossJoin', 'CJ'],
+    ['Symbol', 'Symb'],
+    ['PickTableLayoutForPred', 'PickTSLayout'],
+    ['PickTableLayoutWithoutPred', 'PickTSLayout'],
+]
+
+
+def shorten_optimizer_config(configuration: str) -> str:
+    for k, abbr in _abbreviations:
+        configuration = configuration.replace(k, abbr)
+    return configuration
